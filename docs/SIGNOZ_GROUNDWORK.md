@@ -32,6 +32,16 @@ codex mcp login signoz
 
 For SigNoz Cloud, provide region or hosted MCP URL. For local/self-hosted, use the HTTP `/mcp` endpoint exposed by the SigNoz MCP server.
 
+## Local Foundry Setup
+
+The repo includes `casting.yaml` for Docker Compose with the SigNoz MCP server enabled:
+
+```sh
+foundryctl gauge -f casting.yaml
+foundryctl forge -f casting.yaml
+foundryctl cast -f casting.yaml
+```
+
 ## Build Alignment
 
 TraceGate will follow the SigNoz skill guidance:
