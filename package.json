@@ -9,6 +9,9 @@
     "check": "tsc -b --pretty false",
     "lint": "eslint .",
     "test": "vitest run",
+    "web:dev": "npm run dev -w @tracegate/web",
+    "web:build": "npm run build -w @tracegate/web",
+    "web:preview": "npm run preview -w @tracegate/web",
     "dev": "tsx packages/cli/src/index.ts",
     "tracegate": "tsx packages/cli/src/index.ts",
     "demo": "tsx packages/cli/src/index.ts run --scenario scenarios/support-agent.yaml --contract contracts/agent-release.yaml",
@@ -30,6 +33,7 @@
   },
   "packageManager": "npm@10.8.2",
   "workspaces": [
+    "apps/*",
     "packages/*"
   ],
   "dependencies": {
