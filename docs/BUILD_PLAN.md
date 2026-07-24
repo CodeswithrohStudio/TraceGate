@@ -44,7 +44,9 @@ TraceGate is an observability contract gate for AI agent releases. It runs scena
 
 ## Scope Choices
 
-The first build will not depend on a frontend. A clean CLI plus SigNoz dashboards is stronger for this hackathon than a decorative web app. If time permits, add a small report viewer only after the core gate works.
+The first build originally did not depend on a frontend. The product direction is now upgraded: keep the CLI plus SigNoz pipeline as the working core, then add a polished web product layer with a separate landing page and a dense release workbench.
+
+The UI must not be decorative. It should expose the existing release-gate workflow, make SigNoz evidence easier to use, and help judges understand the product in one guided path. The canonical UI architecture is recorded in `docs/PRODUCT_FLOW.md`, and the visual contract is recorded in `.tastemaker/style-lock.md`.
 
 ## Needed From Rohit
 
