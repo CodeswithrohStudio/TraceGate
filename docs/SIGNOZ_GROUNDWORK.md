@@ -39,8 +39,18 @@ The repo includes `casting.yaml` for Docker Compose with the SigNoz MCP server e
 ```sh
 foundryctl gauge -f casting.yaml
 foundryctl forge -f casting.yaml
+npm run signoz:patch-foundry
 foundryctl cast -f casting.yaml
 ```
+
+Local verification exposed a Foundry-generated Compose issue where the ingester's OpAMP endpoint and MCP `SIGNOZ_URL` pointed at the MCP container instead of the SigNoz app container. The checked-in `casting.yaml.lock` has been adjusted to route OpAMP and API traffic to `tracegate-signoz-signoz-0`.
+
+Current local ports:
+
+- SigNoz UI/API: `http://localhost:8080`
+- OTLP HTTP: `http://localhost:4318`
+- OTLP gRPC: `localhost:4317`
+- SigNoz MCP: `http://localhost:8000/mcp`
 
 ## Build Alignment
 

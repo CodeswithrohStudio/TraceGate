@@ -13,6 +13,7 @@
     "tracegate": "tsx packages/cli/src/index.ts",
     "demo": "tsx packages/cli/src/index.ts run --scenario scenarios/support-agent.yaml --contract contracts/agent-release.yaml",
     "demo:report": "tsx packages/cli/src/index.ts report --input .tracegate/runs/latest/report.json",
+    "signoz:patch-foundry": "node scripts/patch-foundry-compose.mjs",
     "prepare": "husky"
   },
   "keywords": [
