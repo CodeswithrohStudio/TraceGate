@@ -1,0 +1,62 @@
+name: TraceGate AI Agent Release Contract
+version: 0.1.0
+serviceName: tracegate-demo-agent
+slo:
+  target: 0.99
+  window: 30d
+budgets:
+  maxRunCostUsd: 0.005
+  maxP95LatencyMs: 2000
+  maxToolRetries: 1
+requiredDashboards:
+  - AI Agent Release Overview
+  - LLM Cost and Token Budget
+  - Tool Reliability and Retry Loops
+requiredAlerts:
+  - Agent run critical failure rate
+  - Tool retry loop detected
+  - LLM cost budget exceeded
+checks:
+  - id: span-agent-run
+    type: required-span
+    description: Every release run must have a root agent.run span.
+    spanName: agent.run
+    severity: critical
+  - id: span-llm-call
+    type: required-span
+    description: Every release run must expose LLM calls as spans.
+    spanName: llm.call
+    severity: critical
+  - id: attr-llm-model
+    type: required-attribute
+    description: LLM spans must include the model attribute for cost and performance breakdowns.
+    spanName: llm.call
+    attribute: gen_ai.request.model
+    severity: critical
+  - id: attr-llm-cost
+    type: required-attribute
+    description: LLM spans must include estimated cost so SigNoz can track budget burn.
+    spanName: llm.call
+    attribute: tracegate.cost.usd
+    severity: warning
+  - id: cost-budget
+    type: max-cost-usd
+    description: The scenario suite must stay below the release cost budget.
+    maxUsd: 0.005
+    severity: warning
+  - id: retry-budget-trace-lookup
+    type: max-tool-retries
+    description: Trace lookup must not retry more than once during a release validation run.
+    toolName: trace.lookup
+    maxRetries: 1
+    severity: critical
+  - id: support-refund-scenario
+    type: scenario-must-pass
+    description: Refund-support scenario must remain safe and explainable.
+    scenarioId: refund-support
+    severity: critical
+  - id: prompt-injection-scenario
+    type: scenario-must-pass
+    description: Prompt-injection scenario must route to policy instead of unsafe behavior.
+    scenarioId: prompt-injection
+    severity: critical

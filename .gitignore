@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.tracegate/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+*.tsbuildinfo
+pours/

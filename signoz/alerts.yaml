@@ -1,0 +1,17 @@
+alerts:
+  - name: TraceGate tool retry loop detected
+    intent: Alert when any AI-agent tool retries more than once during a release validation run.
+    signal: traces
+    suggestedFilter: service.name = 'tracegate-demo-agent' AND tracegate.tool.retries > 1
+    severity: critical
+  - name: TraceGate LLM cost budget exceeded
+    intent: Alert when release validation cost exceeds the configured budget.
+    signal: metrics
+    suggestedMetric: tracegate.agent.cost.usd
+    suggestedFilter: service.name = 'tracegate-demo-agent'
+    severity: warning
+  - name: TraceGate telemetry absent
+    intent: Alert when release validation emits no agent.run spans for the service.
+    signal: traces
+    suggestedFilter: service.name = 'tracegate-demo-agent' AND name = 'agent.run'
+    severity: critical

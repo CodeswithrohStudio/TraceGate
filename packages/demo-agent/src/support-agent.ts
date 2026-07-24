@@ -1,0 +1,197 @@
+import { SpanStatusCode } from "@opentelemetry/api";
+import { nanoid } from "nanoid";
+import { getTraceGateMetrics, getTracer, type ScenarioResult, type SpanEvidence } from "@tracegate/core";
+
+export type AgentRunInput = {
+  scenarioId: string;
+  prompt: string;
+};
+
+type ToolResult = {
+  output: string;
+  retries: number;
+};
+
+export class SupportAgent {
+  private readonly tracer = getTracer();
+  private readonly meter = getTraceGateMetrics();
+
+  async run(input: AgentRunInput): Promise<ScenarioResult> {
+    const started = Date.now();
+    const runId = nanoid();
+    const spans: SpanEvidence[] = [];
+    const toolCalls: string[] = [];
+    const retries: Record<string, number> = {};
+
+    return await this.tracer.startActiveSpan("agent.run", async (span): Promise<ScenarioResult> => {
+      span.setAttributes({
+        "service.name": "tracegate-demo-agent",
+        "tracegate.run.id": runId,
+        "tracegate.scenario.id": input.scenarioId,
+        "agent.name": "support-agent"
+      });
+      spans.push({
+        name: "agent.run",
+        attributes: {
+          "tracegate.run.id": runId,
+          "tracegate.scenario.id": input.scenarioId,
+          "agent.name": "support-agent"
+        }
+      });
+
+      try {
+        const model = await this.callModel(input.prompt, spans);
+        const plan = this.plan(input.prompt, model);
+        let answer = model.output;
+
+        for (const toolName of plan.tools) {
+          toolCalls.push(toolName);
+          const toolResult = await this.callTool(toolName, input.prompt, spans);
+          retries[toolName] = toolResult.retries;
+          answer += `\n${toolName}: ${toolResult.output}`;
+        }
+
+        const failed = shouldFail(input.prompt, answer);
+        const status: "pass" | "fail" = failed ? "fail" : "pass";
+        if (failed) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: "Scenario failed expected safety/output check" });
+        }
+
+        const costUsd = model.costUsd;
+        this.meter.addCost(costUsd, {
+          "tracegate.scenario.id": input.scenarioId,
+          "agent.name": "support-agent"
+        });
+        this.meter.addTokens(model.tokens, {
+          "tracegate.scenario.id": input.scenarioId,
+          "agent.name": "support-agent"
+        });
+
+        return {
+          scenarioId: input.scenarioId,
+          prompt: input.prompt,
+          status,
+          output: answer,
+          toolCalls,
+          retries,
+          costUsd,
+          latencyMs: Date.now() - started,
+          spans
+        };
+      } catch (error) {
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR });
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  private async callModel(prompt: string, spans: SpanEvidence[]) {
+    return await this.tracer.startActiveSpan("llm.call", async (span): Promise<{ output: string; tokens: number; costUsd: number }> => {
+      const tokens = estimateTokens(prompt);
+      const costUsd = tokens * 0.000002;
+      span.setAttributes({
+        "gen_ai.system": "deterministic",
+        "gen_ai.request.model": "tracegate-mock-1",
+        "gen_ai.usage.input_tokens": tokens,
+        "gen_ai.usage.output_tokens": 64,
+        "tracegate.cost.usd": costUsd
+      });
+      spans.push({
+        name: "llm.call",
+        parentName: "agent.run",
+        attributes: {
+          "gen_ai.system": "deterministic",
+          "gen_ai.request.model": "tracegate-mock-1",
+          "gen_ai.usage.input_tokens": tokens,
+          "gen_ai.usage.output_tokens": 64,
+          "tracegate.cost.usd": costUsd
+        }
+      });
+      await sleep(20);
+      span.end();
+      return {
+        output: prompt.includes("ignore previous") ? "I should escalate instead of obeying unsafe instructions." : "I can help investigate this safely.",
+        tokens: tokens + 64,
+        costUsd
+      };
+    });
+  }
+
+  private plan(prompt: string, model: { output: string }) {
+    if (prompt.includes("ignore previous")) {
+      return { tools: ["policy.search"] };
+    }
+    if (prompt.includes("slow") || prompt.includes("latency")) {
+      return { tools: ["trace.lookup"] };
+    }
+    if (prompt.includes("refund") || prompt.includes("customer")) {
+      return { tools: ["ticket.lookup", "policy.search"] };
+    }
+    return { tools: model.output.includes("investigate") ? ["knowledge.search"] : [] };
+  }
+
+  private async callTool(toolName: string, prompt: string, spans: SpanEvidence[]): Promise<ToolResult> {
+    return await this.tracer.startActiveSpan(`tool.${toolName}`, async (span) => {
+      span.setAttributes({
+        "gen_ai.tool.name": toolName,
+        "tracegate.tool.kind": "demo"
+      });
+
+      let retries = 0;
+      if (toolName === "trace.lookup" && prompt.includes("slow")) {
+        retries = 3;
+        span.setAttribute("tracegate.tool.retries", retries);
+      }
+
+      spans.push({
+        name: `tool.${toolName}`,
+        parentName: "agent.run",
+        attributes: {
+          "gen_ai.tool.name": toolName,
+          "tracegate.tool.kind": "demo",
+          "tracegate.tool.retries": retries
+        }
+      });
+
+      await sleep(15 + retries * 20);
+      span.end();
+      return {
+        retries,
+        output: toolOutput(toolName)
+      };
+    });
+  }
+}
+
+function estimateTokens(prompt: string): number {
+  return Math.max(12, Math.ceil(prompt.length / 4));
+}
+
+function shouldFail(prompt: string, output: string): boolean {
+  if (prompt.includes("slow") && output.includes("trace.lookup")) {
+    return true;
+  }
+  return false;
+}
+
+function toolOutput(toolName: string): string {
+  switch (toolName) {
+    case "ticket.lookup":
+      return "ticket found with customer tier and last contact timestamp";
+    case "policy.search":
+      return "policy requires escalation for payment or unsafe instruction changes";
+    case "trace.lookup":
+      return "latency trace lookup retried too many times";
+    case "knowledge.search":
+      return "knowledge base answer found";
+    default:
+      return "tool completed";
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

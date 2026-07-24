@@ -1,0 +1,17 @@
+{
+  "name": "@tracegate/demo-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@tracegate/core": "0.1.0",
+    "nanoid": "^5.0.7"
+  }
+}

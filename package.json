@@ -1,0 +1,62 @@
+{
+  "name": "tracegate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Observability contracts and CI release gates for AI agents using SigNoz.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "dev": "tsx packages/cli/src/index.ts",
+    "tracegate": "tsx packages/cli/src/index.ts",
+    "demo": "tsx packages/cli/src/index.ts run --scenario scenarios/support-agent.yaml --contract contracts/agent-release.yaml",
+    "demo:report": "tsx packages/cli/src/index.ts report --input .tracegate/runs/latest/report.json",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "signoz",
+    "opentelemetry",
+    "ai-agents",
+    "observability",
+    "release-gate",
+    "hackathon"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.53.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.53.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.53.0",
+    "@opentelemetry/resources": "1.26.0",
+    "@opentelemetry/sdk-logs": "0.53.0",
+    "@opentelemetry/sdk-metrics": "1.26.0",
+    "@opentelemetry/sdk-node": "0.53.0",
+    "@opentelemetry/sdk-trace-base": "1.26.0",
+    "@opentelemetry/semantic-conventions": "1.27.0",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "execa": "^9.3.1",
+    "nanoid": "^5.0.7",
+    "yaml": "^2.5.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.11",
+    "@typescript-eslint/eslint-plugin": "^7.16.1",
+    "@typescript-eslint/parser": "^7.16.1",
+    "eslint": "^8.57.0",
+    "husky": "^9.1.1",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vitest": "^2.0.4"
+  }
+}
