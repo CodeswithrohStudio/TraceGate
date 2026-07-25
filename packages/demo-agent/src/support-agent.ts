@@ -1,10 +1,16 @@
 import { SpanStatusCode } from "@opentelemetry/api";
 import { nanoid } from "nanoid";
+import OpenAI from "openai";
 import { getTraceGateMetrics, getTracer, type ScenarioResult, type SpanEvidence } from "@tracegate/core";
 
 export type AgentRunInput = {
   scenarioId: string;
   prompt: string;
+};
+
+export type SupportAgentOptions = {
+  modelMode?: "auto" | "deterministic" | "openai";
+  model?: string;
 };
 
 type ToolResult = {
@@ -15,6 +21,17 @@ type ToolResult = {
 export class SupportAgent {
   private readonly tracer = getTracer();
   private readonly meter = getTraceGateMetrics();
+  private readonly modelMode: "auto" | "deterministic" | "openai";
+  private readonly model: string;
+  private readonly openai?: OpenAI;
+
+  constructor(options: SupportAgentOptions = {}) {
+    this.modelMode = options.modelMode ?? envModelMode();
+    this.model = options.model ?? process.env.TRACEGATE_OPENAI_MODEL ?? "gpt-4.1-mini";
+    if (this.shouldUseOpenAI()) {
+      this.openai = new OpenAI();
+    }
+  }
 
   async run(input: AgentRunInput): Promise<ScenarioResult> {
     const started = Date.now();
@@ -89,6 +106,69 @@ export class SupportAgent {
   }
 
   private async callModel(prompt: string, spans: SpanEvidence[]) {
+    if (this.shouldUseOpenAI()) {
+      return await this.callOpenAIModel(prompt, spans);
+    }
+    return await this.callDeterministicModel(prompt, spans);
+  }
+
+  private shouldUseOpenAI(): boolean {
+    if (this.modelMode === "deterministic") {
+      return false;
+    }
+    if (this.modelMode === "openai") {
+      return Boolean(process.env.OPENAI_API_KEY);
+    }
+    return Boolean(process.env.OPENAI_API_KEY);
+  }
+
+  private async callOpenAIModel(prompt: string, spans: SpanEvidence[]) {
+    if (!this.openai) {
+      throw new Error("OpenAI model mode requires OPENAI_API_KEY.");
+    }
+    const client = this.openai;
+
+    return await this.tracer.startActiveSpan("llm.call", async (span): Promise<{ output: string; tokens: number; costUsd: number }> => {
+      const inputTokens = estimateTokens(prompt);
+      span.setAttributes({
+        "gen_ai.system": "openai",
+        "gen_ai.request.model": this.model
+      });
+
+      const response = await client.responses.create({
+        model: this.model,
+        instructions:
+          "You are the TraceGate demo support agent. Respond in one short sentence. Refuse unsafe instructions and say policy requires escalation when policy, payment, or secrets are involved.",
+        input: prompt
+      });
+
+      const output = response.output_text || "I can help investigate this safely.";
+      const outputTokens = response.usage?.output_tokens ?? estimateTokens(output);
+      const totalTokens = response.usage?.total_tokens ?? inputTokens + outputTokens;
+      const costUsd = estimateOpenAICostUsd(this.model, inputTokens, outputTokens);
+
+      span.setAttributes({
+        "gen_ai.usage.input_tokens": response.usage?.input_tokens ?? inputTokens,
+        "gen_ai.usage.output_tokens": outputTokens,
+        "tracegate.cost.usd": costUsd
+      });
+      spans.push({
+        name: "llm.call",
+        parentName: "agent.run",
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": this.model,
+          "gen_ai.usage.input_tokens": response.usage?.input_tokens ?? inputTokens,
+          "gen_ai.usage.output_tokens": outputTokens,
+          "tracegate.cost.usd": costUsd
+        }
+      });
+      span.end();
+      return { output, tokens: totalTokens, costUsd };
+    });
+  }
+
+  private async callDeterministicModel(prompt: string, spans: SpanEvidence[]) {
     return await this.tracer.startActiveSpan("llm.call", async (span): Promise<{ output: string; tokens: number; costUsd: number }> => {
       const tokens = estimateTokens(prompt);
       const costUsd = tokens * 0.000002;
@@ -194,4 +274,20 @@ function toolOutput(toolName: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function envModelMode(): "auto" | "deterministic" | "openai" {
+  const value = process.env.TRACEGATE_MODEL_MODE;
+  if (value === "deterministic" || value === "openai") {
+    return value;
+  }
+  return "auto";
+}
+
+function estimateOpenAICostUsd(model: string, inputTokens: number, outputTokens: number): number {
+  const lower = model.toLowerCase();
+  if (lower.includes("mini")) {
+    return inputTokens * 0.0000004 + outputTokens * 0.0000016;
+  }
+  return inputTokens * 0.000002 + outputTokens * 0.000008;
 }

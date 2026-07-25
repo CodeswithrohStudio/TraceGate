@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "node server.mjs --dev",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "start": "node server.mjs",
+    "preview": "node server.mjs"
   },
   "dependencies": {
     "gsap": "^3.12.5",

@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
+import dotenv from "dotenv";
 import {
   createReport,
   evaluateContract,
@@ -26,8 +27,11 @@ program
   .requiredOption("--scenario <path>", "scenario YAML path")
   .requiredOption("--contract <path>", "contract YAML path")
   .option("--out <path>", "report JSON path", ".tracegate/runs/latest/report.json")
+  .option("--model-mode <mode>", "model mode: auto, deterministic, or openai", "auto")
+  .option("--model <model>", "OpenAI model name when model mode uses OpenAI")
   .option("--no-telemetry", "disable OpenTelemetry export")
-  .action(async (options: { scenario: string; contract: string; out: string; telemetry: boolean }) => {
+  .action(async (options: { scenario: string; contract: string; out: string; telemetry: boolean; modelMode: string; model?: string }) => {
+    loadLocalEnv();
     const telemetry = options.telemetry ? startTelemetry() : undefined;
     const scenarioPath = resolve(options.scenario);
     const contractPath = resolve(options.contract);
@@ -38,7 +42,10 @@ program
         readScenarioSuite(scenarioPath),
         readContract(contractPath)
       ]);
-      const agent = new SupportAgent();
+      const agent = new SupportAgent({
+        modelMode: parseModelMode(options.modelMode),
+        model: options.model
+      });
       const scenarioResults = [];
 
       for (const step of suite.steps) {
@@ -79,6 +86,18 @@ program.parseAsync().catch((error: unknown) => {
   console.error(chalk.red(error instanceof Error ? error.message : String(error)));
   process.exitCode = 1;
 });
+
+function loadLocalEnv() {
+  dotenv.config({ path: resolve(".env.local"), quiet: true });
+  dotenv.config({ path: resolve(".env"), quiet: true });
+}
+
+function parseModelMode(value: string): "auto" | "deterministic" | "openai" {
+  if (value === "auto" || value === "deterministic" || value === "openai") {
+    return value;
+  }
+  throw new Error(`Invalid --model-mode '${value}'. Expected auto, deterministic, or openai.`);
+}
 
 async function writeJson(path: string, data: unknown) {
   await mkdir(dirname(path), { recursive: true });

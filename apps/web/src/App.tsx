@@ -18,18 +18,14 @@ import {
   X
 } from "lucide-react";
 import {
-  alertArtifacts,
-  dashboardArtifacts,
-  gateChecks,
+  defaultView,
   landingProof,
   navItems,
-  reportSummary,
-  scenarios,
   signozEndpoints,
-  spanNames,
+  viewFromReport,
   workflowSteps
 } from "./data";
-import type { GateCheck, Scenario } from "./data";
+import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView } from "./data";
 
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
 
@@ -37,12 +33,20 @@ const appPaths = new Set(navItems.map((item) => item.path));
 
 export function App() {
   const [path, setPath] = useState(window.location.pathname);
+  const [view, setView] = useState<TraceGateView>(defaultView);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [selectedCheck, setSelectedCheck] = useState<GateCheck>(
-    gateChecks.find((check) => check.status === "fail") ?? gateChecks[0]
+    defaultView.gateChecks.find((check) => check.status === "fail") ?? defaultView.gateChecks[0]
   );
   const [runState, setRunState] = useState<RunState>("idle");
   const [setupOpen, setSetupOpen] = useState(false);
+
+  useEffect(() => {
+    void loadReport().then((nextView) => {
+      setView(nextView);
+      setSelectedCheck(nextView.gateChecks.find((check) => check.status === "fail") ?? nextView.gateChecks[0]);
+    });
+  }, []);
 
   useEffect(() => {
     const onPop = () => setPath(window.location.pathname);
@@ -78,20 +82,28 @@ export function App() {
     setEvidenceOpen(true);
   };
 
-  const runGate = () => {
+  const runGate = async () => {
     setRunState("preparing");
     setTimeout(() => setRunState("telemetry"), 450);
     setTimeout(() => setRunState("evaluating"), 900);
-    setTimeout(() => {
-      setRunState("blocked");
-      openEvidence(gateChecks.find((check) => check.status === "fail") ?? gateChecks[0]);
-    }, 1350);
+    const response = await fetch("/api/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ modelMode: view.status?.hasOpenAIKey ? "auto" : "deterministic" })
+    });
+    const payload = (await response.json()) as RunPayload;
+    const nextView = viewFromReport(payload.reportPayload?.report ?? null, payload.reportPayload?.status);
+    setView(nextView);
+    const failedCheck = nextView.gateChecks.find((check) => check.status === "fail") ?? nextView.gateChecks[0];
+    setSelectedCheck(failedCheck);
+    setRunState(nextView.reportSummary.status === "pass" ? "idle" : "blocked");
+    openEvidence(failedCheck);
   };
 
   const showApp = path === "/app" || path.startsWith("/app/");
 
   if (!showApp) {
-    return <LandingPage navigate={navigate} openEvidence={() => navigate("/app/evidence")} />;
+    return <LandingPage view={view} navigate={navigate} openEvidence={() => navigate("/app/evidence")} />;
   }
 
   return (
@@ -106,17 +118,49 @@ export function App() {
       openEvidence={openEvidence}
       setupOpen={setupOpen}
       setSetupOpen={setSetupOpen}
+      view={view}
     />
   );
 }
 
+type ReportPayload = {
+  report: TraceGateReport | null;
+  status?: RuntimeStatus;
+};
+
+type RunPayload = {
+  ok: boolean;
+  error?: string;
+  reportPayload?: ReportPayload;
+};
+
+async function loadReport(): Promise<TraceGateView> {
+  const response = await fetch("/api/report");
+  const payload = (await response.json()) as ReportPayload;
+  return viewFromReport(payload.report, payload.status);
+}
+
 function LandingPage({
+  view,
   navigate,
   openEvidence
 }: {
+  view: TraceGateView;
   navigate: (path: string) => void;
   openEvidence: () => void;
 }) {
+  const proofTiles = landingProof.map((item) => ({
+    ...item,
+    value:
+      item.label === "Checks evaluated"
+        ? String(view.reportSummary.totalChecks)
+        : item.label === "Passed"
+          ? String(view.reportSummary.passed)
+          : item.label === "Critical failure"
+            ? String(view.reportSummary.criticalFailures)
+            : view.reportSummary.p95LatencyMs
+  }));
+
   return (
     <main className="site-shell">
       <nav className="landing-nav" data-reveal>
@@ -154,11 +198,11 @@ function LandingPage({
             </button>
           </div>
         </div>
-        <ReleaseVerdictMockup className="hero-visual" />
+        <ReleaseVerdictMockup view={view} className="hero-visual" />
       </section>
 
       <section className="proof-strip" id="product" data-reveal>
-        {landingProof.map((item) => (
+        {proofTiles.map((item) => (
           <div className="proof-tile" key={item.label}>
             <item.icon size={18} />
             <strong>{item.value}</strong>
@@ -176,7 +220,7 @@ function LandingPage({
             agent be shipped, investigated, and held to an observability contract?
           </p>
         </div>
-        <MiniDashboard openApp={() => navigate("/app")} />
+        <MiniDashboard view={view} openApp={() => navigate("/app")} />
       </section>
 
       <section className="workflow-section" data-reveal>
@@ -197,7 +241,7 @@ function LandingPage({
       </section>
 
       <section className="evidence-band" id="evidence" data-reveal>
-        <EvidenceCapture />
+        <EvidenceCapture view={view} />
         <div className="section-copy">
           <p className="eyebrow">Evidence, not vibes</p>
           <h2>Every blocked release needs a useful next question</h2>
@@ -253,11 +297,12 @@ function AppShell({
   selectedCheck,
   openEvidence,
   setupOpen,
-  setSetupOpen
+  setSetupOpen,
+  view
 }: {
   path: string;
   navigate: (path: string) => void;
-  runGate: () => void;
+  runGate: () => Promise<void>;
   runState: RunState;
   evidenceOpen: boolean;
   setEvidenceOpen: (open: boolean) => void;
@@ -265,6 +310,7 @@ function AppShell({
   openEvidence: (check?: GateCheck) => void;
   setupOpen: boolean;
   setSetupOpen: (open: boolean) => void;
+  view: TraceGateView;
 }) {
   return (
     <div className="app-shell">
@@ -307,7 +353,7 @@ function AppShell({
           <div className="topbar-actions">
             <button className="status-chip" type="button" onClick={() => setSetupOpen(true)}>
               <span className="status-dot" />
-              SigNoz connected
+              {view.status?.hasOpenAIKey ? "OpenAI ready" : "Deterministic mode"}
             </button>
             <button className="btn btn-secondary compact" type="button">
               <FileDown size={15} />
@@ -322,7 +368,7 @@ function AppShell({
 
         <div className="content-area" data-reveal>
           <RunProgress runState={runState} />
-          <CurrentPage path={path} openEvidence={openEvidence} navigate={navigate} />
+          <CurrentPage path={path} openEvidence={openEvidence} navigate={navigate} view={view} />
         </div>
       </section>
 
@@ -331,7 +377,7 @@ function AppShell({
         onClose={() => setEvidenceOpen(false)}
         check={selectedCheck}
       />
-      {setupOpen ? <SetupModal onClose={() => setSetupOpen(false)} /> : null}
+      {setupOpen ? <SetupModal view={view} onClose={() => setSetupOpen(false)} /> : null}
     </div>
   );
 }
@@ -339,53 +385,60 @@ function AppShell({
 function CurrentPage({
   path,
   openEvidence,
-  navigate
+  navigate,
+  view
 }: {
   path: string;
   openEvidence: (check?: GateCheck) => void;
   navigate: (path: string) => void;
+  view: TraceGateView;
 }) {
-  if (path === "/app/runs") return <RunsPage openEvidence={openEvidence} />;
-  if (path === "/app/contracts") return <ContractsPage />;
-  if (path === "/app/scenarios") return <ScenariosPage />;
-  if (path === "/app/evidence") return <EvidencePage openEvidence={openEvidence} />;
-  if (path === "/app/signoz") return <SignozPage />;
-  if (path === "/app/alerts") return <AlertsPage />;
-  if (path === "/app/settings") return <SettingsPage />;
-  return <OverviewPage openEvidence={openEvidence} navigate={navigate} />;
+  if (path === "/app/runs") return <RunsPage view={view} openEvidence={openEvidence} />;
+  if (path === "/app/contracts") return <ContractsPage view={view} />;
+  if (path === "/app/scenarios") return <ScenariosPage view={view} />;
+  if (path === "/app/evidence") return <EvidencePage view={view} openEvidence={openEvidence} />;
+  if (path === "/app/signoz") return <SignozPage view={view} />;
+  if (path === "/app/alerts") return <AlertsPage view={view} />;
+  if (path === "/app/settings") return <SettingsPage view={view} />;
+  return <OverviewPage view={view} openEvidence={openEvidence} navigate={navigate} />;
 }
 
 function OverviewPage({
+  view,
   openEvidence,
   navigate
 }: {
+  view: TraceGateView;
   openEvidence: (check?: GateCheck) => void;
   navigate: (path: string) => void;
 }) {
-  const failed = gateChecks.find((check) => check.status === "fail");
+  const failed = view.gateChecks.find((check) => check.status === "fail");
+  const isBlocked = view.reportSummary.status === "fail";
   return (
     <div className="page-grid overview-grid">
       <section className="verdict-panel">
         <div>
           <p className="eyebrow">Latest release verdict</p>
-          <h1>Blocked by retry evidence</h1>
+          <h1>{isBlocked ? "Blocked by retry evidence" : "Ready with trace evidence"}</h1>
           <p>
-            {reportSummary.passed} of {reportSummary.totalChecks} checks passed. One critical
-            contract failure prevents this agent from shipping.
+            {view.reportSummary.passed} of {view.reportSummary.totalChecks} checks passed.
+            {isBlocked
+              ? " One critical contract failure prevents this agent from shipping."
+              : " The release is observable enough to ship."}
           </p>
         </div>
         <div className="verdict-badge">
           <ShieldAlert size={22} />
-          BLOCKED
+          {isBlocked ? "BLOCKED" : "READY"}
         </div>
       </section>
 
-      <MetricRow />
+      <MetricRow view={view} />
 
       <section className="panel wide">
         <PanelHeader title="Gate matrix" action="Open failed evidence" onAction={() => failed && openEvidence(failed)} />
         <div className="check-list">
-          {gateChecks.map((check) => (
+          {view.gateChecks.map((check) => (
             <button
               className={check.status === "fail" ? "check-row failed" : "check-row"}
               type="button"
@@ -424,7 +477,7 @@ function OverviewPage({
   );
 }
 
-function RunsPage({ openEvidence }: { openEvidence: (check?: GateCheck) => void }) {
+function RunsPage({ view, openEvidence }: { view: TraceGateView; openEvidence: (check?: GateCheck) => void }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -438,24 +491,24 @@ function RunsPage({ openEvidence }: { openEvidence: (check?: GateCheck) => void 
           <div className="table-list">
             {["latest"].map((id) => (
               <button className="table-row selected" type="button" key={id}>
-                <span className="pill fail">Blocked</span>
+                <span className={view.reportSummary.status === "fail" ? "pill fail" : "pill pass"}>{view.reportSummary.status === "fail" ? "Blocked" : "Ready"}</span>
                 <strong>{id}</strong>
-                <span>{reportSummary.generatedAt}</span>
-                <code>{reportSummary.serviceName}</code>
+                <span>{view.reportSummary.generatedAt}</span>
+                <code>{view.reportSummary.serviceName}</code>
               </button>
             ))}
           </div>
         </section>
         <section className="panel wide">
           <PanelHeader title="Selected run detail" action="Evidence drawer" onAction={() => openEvidence()} />
-          <ScenarioTimeline />
+          <ScenarioTimeline view={view} />
         </section>
       </div>
     </div>
   );
 }
 
-function ContractsPage() {
+function ContractsPage({ view }: { view: TraceGateView }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -468,14 +521,14 @@ function ContractsPage() {
           <PanelHeader title="Contract revisions" />
           <div className="contract-card active-card">
             <strong>agent-release.yaml</strong>
-            <span>Version {reportSummary.contractVersion}</span>
-            <code>{reportSummary.serviceName}</code>
+            <span>Version {view.reportSummary.contractVersion}</span>
+            <code>{view.reportSummary.serviceName}</code>
           </div>
         </section>
         <section className="panel wide">
           <PanelHeader title="Visual check builder" />
           <div className="builder-grid">
-            {gateChecks.map((check) => (
+            {view.gateChecks.map((check) => (
               <div className="builder-item" key={check.id}>
                 <StatusIcon status={check.status} />
                 <div>
@@ -503,7 +556,7 @@ checks:
   );
 }
 
-function ScenariosPage() {
+function ScenariosPage({ view }: { view: TraceGateView }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -512,7 +565,7 @@ function ScenariosPage() {
         copy="Each scenario exercises a behavior path and expects a safe, explainable outcome."
       />
       <div className="scenario-grid">
-        {scenarios.map((scenario) => (
+        {view.scenarios.map((scenario) => (
           <ScenarioCard scenario={scenario} key={scenario.id} />
         ))}
       </div>
@@ -520,7 +573,7 @@ function ScenariosPage() {
   );
 }
 
-function EvidencePage({ openEvidence }: { openEvidence: (check?: GateCheck) => void }) {
+function EvidencePage({ view, openEvidence }: { view: TraceGateView; openEvidence: (check?: GateCheck) => void }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -531,7 +584,7 @@ function EvidencePage({ openEvidence }: { openEvidence: (check?: GateCheck) => v
       <div className="evidence-grid">
         <section className="panel wide">
           <PanelHeader title="Failed check evidence" action="Open drawer" onAction={() => openEvidence()} />
-          <EvidenceCapture />
+          <EvidenceCapture view={view} />
         </section>
         <section className="panel">
           <PanelHeader title="Suggested queries" />
@@ -546,7 +599,7 @@ function EvidencePage({ openEvidence }: { openEvidence: (check?: GateCheck) => v
   );
 }
 
-function SignozPage() {
+function SignozPage({ view }: { view: TraceGateView }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -565,7 +618,7 @@ function SignozPage() {
         <section className="panel wide">
           <PanelHeader title="Observed span names" />
           <div className="span-cloud">
-            {spanNames.map((span) => (
+            {view.spanNames.map((span) => (
               <code key={span}>{span}</code>
             ))}
           </div>
@@ -573,7 +626,7 @@ function SignozPage() {
         <section className="panel wide">
           <PanelHeader title="Dashboard artifacts" />
           <div className="artifact-list">
-            {dashboardArtifacts.map((dashboard) => (
+            {view.dashboardArtifacts.map((dashboard) => (
               <div className="artifact-row" key={dashboard}>
                 <Check size={15} />
                 <span>{dashboard}</span>
@@ -586,7 +639,7 @@ function SignozPage() {
   );
 }
 
-function AlertsPage() {
+function AlertsPage({ view }: { view: TraceGateView }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -595,7 +648,7 @@ function AlertsPage() {
         copy="Convert contract risks into alert artifacts judges can inspect and teams can adapt."
       />
       <div className="artifact-grid">
-        {alertArtifacts.map((alert) => (
+        {view.alertArtifacts.map((alert) => (
           <section className="panel artifact-card" key={alert}>
             <AlertTriangle size={18} />
             <strong>{alert}</strong>
@@ -607,7 +660,7 @@ function AlertsPage() {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ view }: { view: TraceGateView }) {
   return (
     <div className="page-stack">
       <PageTitle
@@ -617,7 +670,7 @@ function SettingsPage() {
       />
       <div className="settings-grid">
         {[
-          ["OpenAI API key", "Missing until user provides it", KeyRound],
+          ["OpenAI API key", view.status?.hasOpenAIKey ? `Configured for ${view.status.model}` : "Missing; deterministic mode active", KeyRound],
           ["SigNoz target", "Local Foundry stack", ExternalLink],
           ["Report export", ".tracegate/runs/latest/report.json", Clipboard]
         ].map(([label, value, Icon]) => (
@@ -634,8 +687,9 @@ function SettingsPage() {
   );
 }
 
-function ReleaseVerdictMockup({ className = "" }: { className?: string }) {
-  const failed = gateChecks.find((check) => check.status === "fail")!;
+function ReleaseVerdictMockup({ view, className = "" }: { view: TraceGateView; className?: string }) {
+  const failed = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
+  const isBlocked = view.reportSummary.status === "fail";
   return (
     <figure className={`release-mock ${className}`} data-reveal>
       <div className="mock-header">
@@ -643,12 +697,12 @@ function ReleaseVerdictMockup({ className = "" }: { className?: string }) {
         <strong>TraceGate verdict</strong>
       </div>
       <div className="mock-verdict">
-        <span className="pill fail">Blocked</span>
+        <span className={isBlocked ? "pill fail" : "pill pass"}>{isBlocked ? "Blocked" : "Ready"}</span>
         <strong>{failed.label}</strong>
         <p>{failed.evidence}</p>
       </div>
       <div className="trace-waterfall" aria-label="Trace waterfall">
-        {spanNames.map((span, index) => (
+        {view.spanNames.map((span, index) => (
           <div className={`trace-row trace-${index}`} key={span}>
             <span>{span}</span>
             <i />
@@ -663,28 +717,31 @@ function ReleaseVerdictMockup({ className = "" }: { className?: string }) {
   );
 }
 
-function MiniDashboard({ openApp }: { openApp: () => void }) {
+function MiniDashboard({ view, openApp }: { view: TraceGateView; openApp: () => void }) {
   return (
     <div className="mini-dashboard">
       <div className="mini-top">
-        <span className="pill fail">Release blocked</span>
+        <span className={view.reportSummary.status === "fail" ? "pill fail" : "pill pass"}>
+          {view.reportSummary.status === "fail" ? "Release blocked" : "Release ready"}
+        </span>
         <button className="btn btn-secondary compact" type="button" onClick={openApp}>
           Inspect <ArrowRight size={14} />
         </button>
       </div>
-      <MetricRow />
-      <ScenarioTimeline compact />
+      <MetricRow view={view} />
+      <ScenarioTimeline view={view} compact />
     </div>
   );
 }
 
-function EvidenceCapture() {
+function EvidenceCapture({ view }: { view: TraceGateView }) {
+  const failed = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
   return (
     <div className="evidence-capture">
       <div className="capture-left">
         <span className="pill fail">Critical</span>
-        <h3>retry-budget-trace-lookup</h3>
-        <p>Worst retry count for `trace.lookup` was 3; limit 1.</p>
+        <h3>{failed.id}</h3>
+        <p>{failed.evidence}</p>
         <code>name = 'tool.trace.lookup'</code>
       </div>
       <div className="capture-right">
@@ -695,13 +752,13 @@ function EvidenceCapture() {
   );
 }
 
-function MetricRow() {
+function MetricRow({ view }: { view: TraceGateView }) {
   return (
     <div className="metric-row">
-      <Metric label="Checks" value={`${reportSummary.passed}/${reportSummary.totalChecks}`} />
-      <Metric label="Critical failures" value={String(reportSummary.criticalFailures)} tone="fail" />
-      <Metric label="Cost" value={reportSummary.totalCostUsd} />
-      <Metric label="P95 latency" value={reportSummary.p95LatencyMs} />
+      <Metric label="Checks" value={`${view.reportSummary.passed}/${view.reportSummary.totalChecks}`} />
+      <Metric label="Critical failures" value={String(view.reportSummary.criticalFailures)} tone={view.reportSummary.criticalFailures ? "fail" : undefined} />
+      <Metric label="Cost" value={view.reportSummary.totalCostUsd} />
+      <Metric label="P95 latency" value={view.reportSummary.p95LatencyMs} />
     </div>
   );
 }
@@ -715,10 +772,10 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
   );
 }
 
-function ScenarioTimeline({ compact = false }: { compact?: boolean }) {
+function ScenarioTimeline({ view, compact = false }: { view: TraceGateView; compact?: boolean }) {
   return (
     <div className={compact ? "timeline compact" : "timeline"}>
-      {scenarios.map((scenario) => (
+      {view.scenarios.map((scenario) => (
         <div className={scenario.status === "fail" ? "timeline-row failed" : "timeline-row"} key={scenario.id}>
           <StatusIcon status={scenario.status === "pass" ? "pass" : "fail"} />
           <div>
@@ -792,7 +849,7 @@ function EvidenceDrawer({
   );
 }
 
-function SetupModal({ onClose }: { onClose: () => void }) {
+function SetupModal({ view, onClose }: { view: TraceGateView; onClose: () => void }) {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="setup-title">
       <section className="setup-modal">
@@ -807,7 +864,7 @@ function SetupModal({ onClose }: { onClose: () => void }) {
         </div>
         {[
           ["Detect environment", "SigNoz UI, OTLP, and MCP ports are configured."],
-          ["Choose service", reportSummary.serviceName],
+          ["Choose service", view.reportSummary.serviceName],
           ["Choose contract", "contracts/agent-release.yaml"],
           ["Choose scenario", "scenarios/support-agent.yaml"],
           ["Run gate", "Land on the blocked run detail with evidence."]

@@ -45,6 +45,69 @@ export type NavItem = {
   icon: LucideIcon;
 };
 
+export type TraceGateReport = {
+  generatedAt: string;
+  contract: {
+    name: string;
+    version: string;
+    serviceName: string;
+  };
+  status: "pass" | "fail";
+  summary: {
+    totalChecks: number;
+    passed: number;
+    failed: number;
+    criticalFailures: number;
+    totalCostUsd: number;
+    p95LatencyMs: number;
+  };
+  checks: Array<{
+    id: string;
+    type: string;
+    description: string;
+    severity: "critical" | "warning";
+    status: Verdict;
+    evidence: string;
+  }>;
+  scenarios: Array<{
+    scenarioId: string;
+    prompt: string;
+    status: "pass" | "fail";
+    toolCalls: string[];
+    retries: Record<string, number>;
+    costUsd: number;
+    latencyMs: number;
+    spans: Array<{ name: string }>;
+  }>;
+  signoz: {
+    serviceName: string;
+    suggestedQueries: string[];
+    dashboards: string[];
+    alerts: string[];
+  };
+};
+
+export type RuntimeStatus = {
+  hasOpenAIKey: boolean;
+  model: string;
+  reportExists: boolean;
+  signoz: {
+    ui: string;
+    otlpHttp: string;
+    mcp: string;
+  };
+};
+
+export type TraceGateView = {
+  reportSummary: typeof reportSummary;
+  gateChecks: GateCheck[];
+  scenarios: Scenario[];
+  spanNames: string[];
+  dashboardArtifacts: string[];
+  alertArtifacts: string[];
+  status?: RuntimeStatus;
+};
+
 export const navItems: NavItem[] = [
   { label: "Overview", path: "/app", icon: Home },
   { label: "Runs", path: "/app/runs", icon: Activity },
@@ -195,6 +258,70 @@ export const alertArtifacts = [
   "Tool retry loop detected",
   "LLM cost budget exceeded"
 ];
+
+export const defaultView: TraceGateView = {
+  reportSummary,
+  gateChecks,
+  scenarios,
+  spanNames,
+  dashboardArtifacts,
+  alertArtifacts
+};
+
+export function viewFromReport(report: TraceGateReport | null, status?: RuntimeStatus): TraceGateView {
+  if (!report) {
+    return { ...defaultView, status };
+  }
+  return {
+    reportSummary: {
+      generatedAt: report.generatedAt,
+      serviceName: report.contract.serviceName,
+      contractName: report.contract.name,
+      contractVersion: report.contract.version,
+      status: report.status,
+      totalChecks: report.summary.totalChecks,
+      passed: report.summary.passed,
+      failed: report.summary.failed,
+      criticalFailures: report.summary.criticalFailures,
+      totalCostUsd: `$${report.summary.totalCostUsd.toFixed(6)}`,
+      p95LatencyMs: `${report.summary.p95LatencyMs}ms`,
+      maxRunCostUsd: reportSummary.maxRunCostUsd,
+      maxToolRetries: reportSummary.maxToolRetries
+    },
+    gateChecks: report.checks.map((check) => ({
+      id: check.id,
+      label: labelForCheck(check.id),
+      type: check.type,
+      severity: check.severity,
+      status: check.status,
+      evidence: check.evidence
+    })),
+    scenarios: report.scenarios.map((scenario) => ({
+      id: scenario.scenarioId,
+      prompt: scenario.prompt,
+      status: scenario.status,
+      tools: scenario.toolCalls,
+      retries: Object.values(scenario.retries).join(", ") || "0",
+      cost: `$${scenario.costUsd.toFixed(6)}`,
+      latency: `${scenario.latencyMs}ms`
+    })),
+    spanNames: Array.from(new Set(report.scenarios.flatMap((scenario) => scenario.spans.map((span) => span.name)))),
+    dashboardArtifacts: report.signoz.dashboards,
+    alertArtifacts: report.signoz.alerts,
+    status
+  };
+}
+
+function labelForCheck(id: string): string {
+  const match = gateChecks.find((check) => check.id === id);
+  if (match) {
+    return match.label;
+  }
+  return id
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export const landingProof = [
   { label: "Checks evaluated", value: "8", icon: ClipboardCheck },

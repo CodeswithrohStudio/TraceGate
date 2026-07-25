@@ -9,3 +9,4 @@ coverage/
 *.tsbuildinfo
 pours/
 output/
+outputs/
