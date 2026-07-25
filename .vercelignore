@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+.tracegate
+output
+outputs
+node_modules
+casting.yaml.lock
