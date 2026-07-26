@@ -2,12 +2,12 @@
   {
     "date": "2026-07-26",
     "page": "landing",
-    "macrostructure": "Poster Fold + Product Demo / Workbench",
+    "macrostructure": "Long-Scroll Narrative + Product Demo / Workbench",
     "nav": "N3",
-    "hero": "H3/H2",
+    "hero": "H2",
     "footer": "Ft1",
-    "knobs": "hero=full-screen boomerang media/centered TraceGate headline/bottom-left CTA; features=F4 release docket + F5 evidence capture",
-    "brief": "Prompt-based landing redesign using immersive video hero while preserving TraceGate copy"
+    "knobs": "hero=local TraceGate SVG scene/centered headline/bottom-left CTA; arc=Hook -> Risk -> Mechanism -> How it works -> Proof -> Close; features=problem comparison + F5 evidence capture + F4 steps",
+    "brief": "Fix broken remote hero asset and rebuild landing sections as a coherent product story"
   },
   {
     "date": "2026-07-26",

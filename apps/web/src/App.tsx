@@ -20,7 +20,6 @@ import {
   Sparkles,
   X
 } from "lucide-react";
-import BoomerangVideoBg from "./BoomerangVideoBg";
 import {
   defaultView,
   navItems,
@@ -32,8 +31,6 @@ import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
 
 const appPaths = new Set(navItems.map((item) => item.path));
-const LANDING_VIDEO =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260511_131941_d136af49-e243-493a-be14-6ff3f24e09e6.mp4";
 gsap.registerPlugin(ScrollTrigger);
 
 export function App() {
@@ -209,6 +206,12 @@ function LandingPage({
     ["Noz prompts", "Why did this release fail its retry budget?", Search],
     ["MCP", "Local endpoint at http://localhost:8000/mcp", Command]
   ] as const;
+  const storySteps = [
+    ["01", "Run the risky path", "Refund, latency, and prompt-injection scenarios exercise behavior before release."],
+    ["02", "Capture the trace", "Model, tool, retry, cost, and latency spans land as OpenTelemetry evidence."],
+    ["03", "Check the contract", "TraceGate compares the observed run against budgets that define observable enough."],
+    ["04", "Block or ship", "The failed span becomes a verdict, not a vague dashboard note."]
+  ] as const;
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -220,12 +223,7 @@ function LandingPage({
   return (
     <main className="immersive-landing">
       <section className="landing-film">
-        <BoomerangVideoBg src={LANDING_VIDEO} />
-        <div className="film-fallback" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
+        <img className="hero-scene-asset" src="/assets/tracegate-hero-scene.svg" alt="" aria-hidden="true" />
         <div className="film-wash" />
 
         <nav className="film-nav" data-reveal>
@@ -313,38 +311,44 @@ function LandingPage({
       </section>
 
       <div className="site-shell film-proof-shell">
-        <section className="release-docket" id="narrative" data-reveal>
-          <div className="docket-heading">
-            <span>Release docket</span>
-            <strong>Latest support-agent run</strong>
+        <section className="stakes-section" id="narrative" data-reveal>
+          <div className="section-copy">
+            <p className="eyebrow">The risk</p>
+            <h2>Agent releases fail in the gap between a passing demo and a trustworthy trace.</h2>
+            <p>Without a release gate, teams discover tool loops, hidden cost, and unsafe retries after users have already touched the agent.</p>
           </div>
-          {[
-            ["Scenario", "Refund abuse", "Prompt, tool call, and retry path exercised"],
-            ["Observation", "tool.trace.lookup", "3 retries recorded on the trace span"],
-            ["Decision", isBlockedLabel(view), "Contract blocks the deploy"]
-          ].map(([label, title, copy]) => (
-            <article className="docket-card" key={label}>
-              <span>{label}</span>
-              <strong>{title}</strong>
-              <p>{copy}</p>
+          <div className="stakes-visual">
+            <article>
+              <span>Without TraceGate</span>
+              <strong>Demo passes</strong>
+              <p>Retries and tool behavior stay buried until someone opens SigNoz after the incident.</p>
             </article>
-          ))}
+            <ArrowRight size={18} />
+            <article>
+              <span>With TraceGate</span>
+              <strong>Trace decides</strong>
+              <p>The same SigNoz evidence becomes a release control before deploy.</p>
+            </article>
+          </div>
         </section>
 
-        <section className="story-section">
+        <section className="mechanism-section" data-reveal>
+          <div className="section-copy">
+            <p className="eyebrow">The mechanism</p>
+            <h2>TraceGate turns observability into a contract.</h2>
+            <p>The product does not ask reviewers to interpret raw telemetry. It packages a failed span, the exact budget, and the Noz prompt into one reviewable packet.</p>
+          </div>
+          <EvidenceCapture view={view} />
+        </section>
+
+        <section className="story-section" data-reveal>
           <div className="section-copy sticky-copy" data-reveal>
-            <p className="eyebrow">Trace to verdict</p>
-            <h2>The site should feel like evidence, not marketing.</h2>
-            <p>Each beat shows how a messy agent run becomes a decision a reviewer can inspect.</p>
+            <p className="eyebrow">How it works</p>
+            <h2>Four steps turn a messy agent run into a release verdict.</h2>
+            <p>Each step maps to something judges can inspect: a scenario, a trace, a contract, and the final blocked decision.</p>
           </div>
           <div className="story-steps">
-            {[
-              ["01", "Exercise the risky path", "Refund, latency, and prompt-injection cases run before a release is trusted."],
-              ["02", "Capture the agent behavior", "Model, tool, retry, cost, and latency spans are recorded with OpenTelemetry."],
-              ["03", "Read it inside SigNoz", "Dashboards, alerts, and Noz prompts turn traces into a shared investigation surface."],
-              ["04", "Apply the contract", "TraceGate compares the observed run against the release budget."],
-              ["05", "Publish the evidence", "The blocked decision comes with the exact span and query that justify it."]
-            ].map(([step, title, copy]) => (
+            {storySteps.map(([step, title, copy]) => (
               <article className="story-step" data-story-step key={title}>
                 <span>{step}</span>
                 <div>
@@ -356,16 +360,21 @@ function LandingPage({
           </div>
         </section>
 
-        <section className="workbench-band" data-reveal>
+        <section className="workbench-band proof-section" data-reveal>
           <div className="section-copy">
-            <p className="eyebrow">Workbench proof</p>
-            <h2>A compact control room for one release question.</h2>
+            <p className="eyebrow">The proof</p>
+            <h2>The workbench answers one release question: can this agent ship?</h2>
+            <p>Here the story becomes concrete: seven checks pass, one retry-budget contract fails, and the evidence drawer knows exactly which span proves it.</p>
           </div>
           <MiniDashboard view={view} openApp={() => navigate("/app")} />
         </section>
 
         <section className="evidence-band" id="evidence" data-reveal>
-          <EvidenceCapture view={view} />
+          <div className="section-copy">
+            <p className="eyebrow">Evidence packet</p>
+            <h2>A blocked release should come with a reason people can verify.</h2>
+            <p>The failed check points to the exact span, the exceeded budget, and the investigation prompt for SigNoz.</p>
+          </div>
           <div className="evidence-ledger">
             <div className="ledger-row">
               <span>Failed check</span>
@@ -385,7 +394,8 @@ function LandingPage({
         <section className="spec-section" id="signoz" data-reveal>
           <div className="section-copy">
             <p className="eyebrow">SigNoz expansion</p>
-            <h2>SigNoz becomes the review surface for agent quality.</h2>
+            <h2>SigNoz becomes the shared review surface for agent quality.</h2>
+            <p>TraceGate expands SigNoz from incident investigation into pre-release governance for AI agents.</p>
           </div>
           <div className="spec-table spec-grid">
             {signozCards.map(([label, value, Icon]) => (
@@ -414,10 +424,6 @@ function LandingPage({
       </div>
     </main>
   );
-}
-
-function isBlockedLabel(view: TraceGateView) {
-  return view.reportSummary.status === "fail" ? "Blocked" : "Ready";
 }
 
 function AppShell({

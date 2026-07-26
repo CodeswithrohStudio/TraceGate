@@ -1,5 +1,6 @@
-/* tastemaker · macrostructure: Poster Fold + Product Demo / Workbench · mood: technical · page: landing+app
- * nav: N3 glass pill · hero: H3/H2 video fold with bottom-left CTA · footer: Ft1 masthead · knobs: hero=video-backed/centered-title/bottom-utility; features=F4 release docket + F5 evidence capture; app=compact release control shell
+/* tastemaker · macrostructure: Long-Scroll Narrative + Product Demo / Workbench · mood: technical · page: landing+app
+ * nav: N3 glass pill · hero: H2 local trace scene · footer: Ft1 masthead · arc: Hook -> Risk -> Mechanism -> How it works -> Proof -> Close
+ * knobs: hero=local-svg-asset/centered-title/bottom-utility; features=problem-before-after + F5 evidence capture + F4 steps
  * palette: technical/dark generated 2026-07-24 · contrast: pass (matrix)
  * critique: ShowTell 5 · Phil 5 · Hier 5 · Spec 5 · Restr 5 · Var 5
  */
@@ -84,20 +85,14 @@ kbd {
   width: min(1180px, calc(100% - 32px));
 }
 
-.boomerang-bg,
-.boomerang-media {
+.hero-scene-asset {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-}
-
-.boomerang-bg {
   z-index: -3;
-}
-
-.boomerang-media {
   object-fit: cover;
+  opacity: 0.92;
 }
 
 .landing-film {
@@ -106,27 +101,6 @@ kbd {
   overflow: hidden;
   isolation: isolate;
 }
-
-.film-fallback {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background: var(--color-bg);
-}
-
-.film-fallback span {
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  height: 1px;
-  background: rgba(233, 243, 254, 0.42);
-  transform: rotate(-16deg);
-  opacity: 0.55;
-}
-
-.film-fallback span:nth-child(1) { top: 32%; }
-.film-fallback span:nth-child(2) { top: 52%; transform: rotate(12deg); }
-.film-fallback span:nth-child(3) { top: 70%; }
 
 .film-wash {
   position: absolute;
@@ -603,7 +577,6 @@ kbd {
 }
 
 .hero-proof-note,
-.release-docket,
 .ledger-row {
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -733,34 +706,7 @@ kbd {
   border-top: 1px solid var(--color-border);
 }
 
-.release-docket {
-  display: grid;
-  grid-template-columns: 0.9fr repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 80px;
-  padding: 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-}
-
-.docket-heading,
-.docket-card {
-  min-height: 132px;
-  padding: 18px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg);
-}
-
-.docket-heading {
-  display: grid;
-  align-content: space-between;
-  border-color: var(--color-primary);
-}
-
-.docket-heading span,
-.docket-card span,
+.stakes-visual span,
 .ledger-row span {
   display: block;
   color: var(--color-muted);
@@ -769,20 +715,18 @@ kbd {
   text-transform: uppercase;
 }
 
-.docket-heading strong,
-.docket-card strong {
+.stakes-visual strong {
   display: block;
-  margin-top: 10px;
+  margin-top: 14px;
   font-family: var(--font-display);
-  font-size: 20px;
-  line-height: 1.16;
+  font-size: 28px;
+  line-height: 1.1;
 }
 
-.docket-card p {
-  margin: 12px 0 0;
+.stakes-visual p {
+  margin: 34px 0 0;
   color: var(--color-muted);
-  font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .proof-tile,
@@ -813,16 +757,20 @@ kbd {
   font-size: 13px;
 }
 
+.stakes-section,
+.mechanism-section,
 .workbench-band,
 .evidence-band,
 .spec-section,
 .workflow-section,
 .closing-cta,
 .story-section {
-  padding: 92px 0;
+  padding: 104px 0;
   border-top: 1px solid var(--color-border);
 }
 
+.stakes-section,
+.mechanism-section,
 .workbench-band,
 .evidence-band,
 .story-section {
@@ -830,6 +778,45 @@ kbd {
   grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
   gap: 36px;
   align-items: center;
+}
+
+.stakes-section,
+.mechanism-section {
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: 52px;
+}
+
+.stakes-visual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.stakes-visual article {
+  min-height: 220px;
+  display: grid;
+  align-content: space-between;
+  padding: 22px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.stakes-visual article:first-child {
+  background: var(--color-bg);
+}
+
+.stakes-visual article:last-child {
+  border-color: var(--color-primary);
+}
+
+.stakes-visual svg {
+  color: var(--color-accent);
+}
+
+.mechanism-section .evidence-capture {
+  min-height: 300px;
 }
 
 .story-section {
@@ -879,7 +866,7 @@ kbd {
 }
 
 .evidence-band {
-  grid-template-columns: minmax(0, 1.12fr) minmax(320px, 0.64fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.72fr);
 }
 
 .section-copy h2,
@@ -1718,6 +1705,8 @@ kbd {
 
   .hero-grid,
   .dossier-hero,
+  .stakes-section,
+  .mechanism-section,
   .story-section,
   .workbench-band,
   .evidence-band,
@@ -1728,8 +1717,13 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .release-docket {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stakes-visual {
+    grid-template-columns: 1fr;
+  }
+
+  .stakes-visual > svg {
+    transform: rotate(90deg);
+    justify-self: start;
   }
 
   .hero-grid {
@@ -1793,11 +1787,6 @@ kbd {
     font-size: clamp(2.1rem, 11vw, 3.25rem);
   }
 
-  .release-docket {
-    grid-template-columns: 1fr;
-    margin-bottom: 56px;
-  }
-
   .release-summary {
     grid-template-columns: 1fr;
   }
@@ -1853,6 +1842,18 @@ kbd {
 
   .content-area {
     padding: 14px;
+  }
+
+  .site-footer {
+    min-height: auto;
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px 0;
+  }
+
+  .site-footer span {
+    max-width: 100%;
+    line-height: 1.45;
   }
 
   .verdict-panel {
