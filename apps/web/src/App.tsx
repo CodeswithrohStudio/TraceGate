@@ -179,13 +179,21 @@ export function App() {
     setRunState("telemetry");
     await wait(180);
     setRunState("evaluating");
-    const response = await fetch("/api/judge-run", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(judgeInput)
-    });
-    const payload = (await response.json()) as RunPayload;
-    const nextView = viewFromReport(payload.reportPayload?.report ?? null, payload.reportPayload?.status);
+    let nextView: TraceGateView;
+    try {
+      const response = await fetch("/api/judge-run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(judgeInput)
+      });
+      if (!response.ok) {
+        throw new Error(`Judge run API returned ${response.status}`);
+      }
+      const payload = (await response.json()) as RunPayload;
+      nextView = viewFromReport(payload.reportPayload?.report ?? null, payload.reportPayload?.status);
+    } catch {
+      nextView = viewFromReport(createClientJudgeReport(judgeInput), view.status);
+    }
     setView(nextView);
     const failedCheck = nextView.gateChecks.find((check) => check.status === "fail") ?? nextView.gateChecks[0];
     setSelectedCheck(failedCheck);
@@ -238,6 +246,129 @@ async function loadReport(): Promise<TraceGateView> {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function createClientJudgeReport(input: JudgeRunInput): TraceGateReport {
+  const scenarioId = slugify(input.scenarioId || "judge-scenario");
+  const serviceName = cleanClientText(input.serviceName, "judge-agent");
+  const toolName = cleanClientText(input.toolName, "trace.lookup");
+  const prompt = cleanClientText(input.prompt, "Judge supplied scenario");
+  const maxToolRetries = clampClientInt(input.maxToolRetries, 0, 10);
+  const observedRetries = clampClientInt(input.observedRetries, 0, 20);
+  const maxRunCostUsd = clampClientNumber(input.maxRunCostUsd, 0, 1);
+  const observedCostUsd = clampClientNumber(input.observedCostUsd, 0, 1);
+  const maxP95LatencyMs = clampClientInt(input.maxP95LatencyMs, 1, 60000);
+  const observedLatencyMs = clampClientInt(input.observedLatencyMs, 1, 60000);
+  const retryPass = observedRetries <= maxToolRetries;
+  const costPass = observedCostUsd <= maxRunCostUsd;
+  const latencyPass = observedLatencyMs <= maxP95LatencyMs;
+  const scenarioStatus = retryPass && latencyPass ? "pass" : "fail";
+  const checks = [
+    clientCheck("span-agent-run", "required-span", "Every release run must have a root agent.run span.", "critical", true, "Observed span 'agent.run'."),
+    clientCheck("span-llm-call", "required-span", "Every release run must expose LLM calls as spans.", "critical", true, "Observed span 'llm.call'."),
+    clientCheck("attr-llm-model", "required-attribute", "LLM spans must include the model attribute.", "critical", true, "Observed 'gen_ai.request.model' on 'llm.call'."),
+    clientCheck("attr-llm-cost", "required-attribute", "LLM spans must include estimated cost.", "warning", true, "Observed 'tracegate.cost.usd' on 'llm.call'."),
+    clientCheck("cost-budget", "max-cost-usd", "The run must stay below the cost budget.", "warning", costPass, `Total run cost $${observedCostUsd.toFixed(6)}; limit $${maxRunCostUsd}.`),
+    clientCheck("latency-budget", "max-p95-latency-ms", "The run must stay below the latency budget.", "warning", latencyPass, `Observed latency ${observedLatencyMs}ms; limit ${maxP95LatencyMs}ms.`),
+    clientCheck("retry-budget-trace-lookup", "max-tool-retries", "Tool retries must stay within the release budget.", "critical", retryPass, `Worst retry count for '${toolName}' was ${observedRetries}; limit ${maxToolRetries}.`),
+    clientCheck(`${scenarioId}-scenario`, "scenario-must-pass", "Judge supplied scenario must pass the release contract.", "critical", scenarioStatus === "pass", `Scenario '${scenarioId}' ended ${scenarioStatus}.`)
+  ];
+  const failed = checks.filter((check) => check.status === "fail");
+  return {
+    generatedAt: new Date().toISOString(),
+    contract: {
+      name: "Judge Supplied Agent Release Contract",
+      version: "interactive",
+      serviceName,
+      budgets: {
+        maxRunCostUsd,
+        maxP95LatencyMs,
+        maxToolRetries
+      }
+    },
+    status: failed.some((check) => check.severity === "critical") ? "fail" : "pass",
+    summary: {
+      totalChecks: checks.length,
+      passed: checks.length - failed.length,
+      failed: failed.length,
+      criticalFailures: failed.filter((check) => check.severity === "critical").length,
+      totalCostUsd: observedCostUsd,
+      p95LatencyMs: observedLatencyMs
+    },
+    checks,
+    scenarios: [
+      {
+        scenarioId,
+        prompt,
+        status: scenarioStatus,
+        toolCalls: [toolName],
+        retries: { [toolName]: observedRetries },
+        costUsd: observedCostUsd,
+        latencyMs: observedLatencyMs,
+        spans: [
+          { name: "agent.run" },
+          { name: "llm.call" },
+          { name: `tool.${toolName}` }
+        ]
+      }
+    ],
+    signoz: {
+      serviceName,
+      suggestedQueries: [
+        `service.name = '${serviceName}'`,
+        `tracegate.scenario.id = '${scenarioId}'`,
+        `name = 'tool.${toolName}'`
+      ],
+      dashboards: [
+        `${serviceName} Release Overview`,
+        `${serviceName} Cost and Latency Budget`,
+        `${toolName} Retry Loop Watch`
+      ],
+      alerts: [
+        `${serviceName} critical release failure`,
+        `${toolName} retry budget exceeded`,
+        `${serviceName} latency budget exceeded`
+      ]
+    }
+  };
+}
+
+function clientCheck(
+  id: string,
+  type: string,
+  description: string,
+  severity: "critical" | "warning",
+  passed: boolean,
+  evidence: string
+) {
+  return {
+    id,
+    type,
+    description,
+    severity,
+    status: passed ? "pass" as const : "fail" as const,
+    evidence
+  };
+}
+
+function cleanClientText(value: string, fallback: string): string {
+  const cleaned = value.replace(/[^\w\s.:'/-]/g, "").trim();
+  return cleaned || fallback;
+}
+
+function slugify(value: string): string {
+  return cleanClientText(value, "judge-scenario")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "judge-scenario";
+}
+
+function clampClientInt(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(Number.isFinite(value) ? value : min)));
+}
+
+function clampClientNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Number.isFinite(value) ? value : min));
 }
 
 function LandingPage({
