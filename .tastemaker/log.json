@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-07-26",
+    "page": "landing",
+    "macrostructure": "Long-Scroll Narrative",
+    "nav": "N5/N6",
+    "hero": "H1",
+    "footer": "Ft4",
+    "knobs": "hero=statement/left-bias/single-verdict-proof; features=F3 sticky narrative + F5 evidence capture; cta=C2 statement",
+    "brief": "TraceGate SigNoz AI-agent release gate landing revamp"
+  }
+]

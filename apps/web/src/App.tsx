@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   Activity,
   AlertTriangle,
@@ -19,17 +20,16 @@ import {
 } from "lucide-react";
 import {
   defaultView,
-  landingProof,
   navItems,
   signozEndpoints,
-  viewFromReport,
-  workflowSteps
+  viewFromReport
 } from "./data";
 import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView } from "./data";
 
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
 
 const appPaths = new Set(navItems.map((item) => item.path));
+gsap.registerPlugin(ScrollTrigger);
 
 export function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -60,15 +60,62 @@ export function App() {
       return;
     }
     const ctx = gsap.context(() => {
+      const heroTimeline = gsap.timeline();
+      heroTimeline
+        .from("[data-hero-context]", {
+          y: 10,
+          opacity: 0,
+          duration: 0.2,
+          ease: "power2.out"
+        })
+        .from("[data-hero-title]", {
+          y: 14,
+          opacity: 0,
+          duration: 0.28,
+          ease: "power2.out"
+        }, "-=0.05")
+        .from("[data-hero-actions]", {
+          y: 10,
+          opacity: 0,
+          duration: 0.22,
+          ease: "power2.out"
+        }, "-=0.08")
+        .from("[data-hero-proof]", {
+          y: 16,
+          opacity: 0,
+          duration: 0.28,
+          ease: "power2.out"
+        }, "-=0.12");
+
       gsap.from("[data-reveal]", {
         y: 12,
         opacity: 0,
         duration: 0.24,
         ease: "power2.out",
-        stagger: 0.04
+        stagger: 0.04,
+        scrollTrigger: {
+          trigger: "[data-reveal]",
+          start: "top 88%",
+          toggleActions: "play none none reverse"
+        }
+      });
+
+      gsap.from("[data-story-step]", {
+        x: -18,
+        duration: 0.24,
+        ease: "power2.out",
+        stagger: 0.08,
+        scrollTrigger: {
+          trigger: ".story-steps",
+          start: "top 82%",
+          toggleActions: "play none none reverse"
+        }
       });
     }, document.body);
-    return () => ctx.revert();
+    return () => {
+      ctx.revert();
+      ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+    };
   }, [path]);
 
   const navigate = (nextPath: string) => {
@@ -149,24 +196,20 @@ function LandingPage({
   navigate: (path: string) => void;
   openEvidence: () => void;
 }) {
-  const proofTiles = landingProof.map((item) => ({
-    ...item,
-    value:
-      item.label === "Checks evaluated"
-        ? String(view.reportSummary.totalChecks)
-        : item.label === "Passed"
-          ? String(view.reportSummary.passed)
-          : item.label === "Critical failure"
-            ? String(view.reportSummary.criticalFailures)
-            : view.reportSummary.p95LatencyMs
-  }));
+  const failedCheck = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
+  const signozCards = [
+    ["Dashboards", "Release overview, LLM cost, tool retry loops", Activity],
+    ["Alerts", "Failure rate, retry loops, cost budget", AlertTriangle],
+    ["Noz prompts", "Why did this release fail its retry budget?", Search],
+    ["MCP", "Local endpoint at http://localhost:8000/mcp", Command]
+  ] as const;
 
   return (
-    <main className="site-shell">
+    <main className="site-shell narrative-shell">
       <nav className="landing-nav" data-reveal>
         <Brand />
         <div className="nav-cluster" aria-label="Primary">
-          <a href="#product">Product</a>
+          <a href="#narrative">Product</a>
           <a href="#evidence">Evidence</a>
           <a href="#signoz">SigNoz</a>
           <a href="/docs/PRODUCT_FLOW.md">Docs</a>
@@ -181,15 +224,15 @@ function LandingPage({
         </button>
       </nav>
 
-      <section className="hero-grid">
-        <div className="hero-copy" data-reveal>
-          <p className="eyebrow">SigNoz release evidence for AI agents</p>
-          <h1>Stop blind agent releases before they ship</h1>
+      <section className="narrative-hero">
+        <div className="hero-copy">
+          <p className="eyebrow" data-hero-context>SigNoz release evidence for AI agents</p>
+          <h1 data-hero-title>Block blind agent releases.</h1>
           <p className="hero-lede">
-            TraceGate runs agent scenarios, sends telemetry to SigNoz, and blocks releases that
-            are not observable enough to debug.
+            TraceGate runs risky agent scenarios, sends every step to SigNoz, and turns the
+            resulting telemetry into a ship or block decision.
           </p>
-          <div className="hero-actions">
+          <div className="hero-actions" data-hero-actions>
             <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
               Open workbench <ArrowRight size={16} />
             </button>
@@ -198,82 +241,98 @@ function LandingPage({
             </button>
           </div>
         </div>
-        <ReleaseVerdictMockup view={view} className="hero-visual" />
-      </section>
-
-      <section className="proof-strip" id="product" data-reveal>
-        {proofTiles.map((item) => (
-          <div className="proof-tile" key={item.label}>
-            <item.icon size={18} />
-            <strong>{item.value}</strong>
-            <span>{item.label}</span>
+        <div className="hero-proof-stack" data-hero-proof>
+          <ReleaseVerdictMockup view={view} className="hero-visual" />
+          <div className="hero-proof-note">
+            <ShieldAlert size={18} />
+            <span>{failedCheck.evidence}</span>
           </div>
-        ))}
+        </div>
       </section>
 
-      <section className="workbench-band" data-reveal>
-        <div className="section-copy">
-          <p className="eyebrow">Workbench proof</p>
-          <h2>The first screen is the release decision</h2>
-          <p>
-            TraceGate starts from the question engineers actually ask before deploy: can this
-            agent be shipped, investigated, and held to an observability contract?
-          </p>
+      <section className="decision-strip" id="narrative" data-reveal>
+        <div>
+          <span>Before</span>
+          <strong>Telemetry is something you inspect after the incident.</strong>
         </div>
-        <MiniDashboard view={view} openApp={() => navigate("/app")} />
+        <ArrowRight size={18} />
+        <div>
+          <span>After</span>
+          <strong>Telemetry becomes the release control before deploy.</strong>
+        </div>
       </section>
 
-      <section className="workflow-section" data-reveal>
-        <div className="section-copy">
-          <p className="eyebrow">How the gate works</p>
-          <h2>Contract to verdict, with SigNoz in the loop</h2>
+      <section className="story-section">
+        <div className="section-copy sticky-copy" data-reveal>
+          <p className="eyebrow">The release story</p>
+          <h2>One failed retry budget becomes a clear product decision.</h2>
+          <p>Scroll the run from scenario to verdict. Each step leaves evidence a judge can verify.</p>
         </div>
-        <div className="workflow-grid">
-          {workflowSteps.map((step, index) => (
-            <article className="workflow-card" key={step.title}>
-              <div className="step-number">{String(index + 1).padStart(2, "0")}</div>
-              <step.icon size={20} />
-              <h3>{step.title}</h3>
-              <p>{step.copy}</p>
+        <div className="story-steps">
+          {[
+            ["01", "Scenario pack", "Refund, latency, and prompt-injection cases exercise the agent before release."],
+            ["02", "Agent run", "The support agent calls the model and tools in deterministic or OpenAI mode."],
+            ["03", "OpenTelemetry", "Root, LLM, and tool spans carry model, cost, and retry evidence."],
+            ["04", "SigNoz evidence", "The traces become the release record instead of a postmortem artifact."],
+            ["05", "Contract verdict", "Seven checks pass. One critical retry budget fails. Release blocked."]
+          ].map(([step, title, copy]) => (
+            <article className="story-step" data-story-step key={title}>
+              <span>{step}</span>
+              <div>
+                <strong>{title}</strong>
+                <p>{copy}</p>
+              </div>
             </article>
           ))}
         </div>
       </section>
 
+      <section className="workbench-band" data-reveal>
+        <div className="section-copy">
+          <p className="eyebrow">Workbench proof</p>
+          <h2>The first app screen answers one question: can this ship?</h2>
+        </div>
+        <MiniDashboard view={view} openApp={() => navigate("/app")} />
+      </section>
+
       <section className="evidence-band" id="evidence" data-reveal>
         <EvidenceCapture view={view} />
-        <div className="section-copy">
-          <p className="eyebrow">Evidence, not vibes</p>
-          <h2>Every blocked release needs a useful next question</h2>
-          <p>
-            The default candidate fails because `trace.lookup` retries three times against a max
-            retry budget of one. The product turns that into a trace query and Noz prompt.
-          </p>
+        <div className="evidence-ledger">
+          <div className="ledger-row">
+            <span>Failed check</span>
+            <strong>{failedCheck.label}</strong>
+          </div>
+          <div className="ledger-row">
+            <span>Span proof</span>
+            <strong>tool.trace.lookup · retries = 3</strong>
+          </div>
+          <div className="ledger-row">
+            <span>Budget</span>
+            <strong>max retries = {view.reportSummary.maxToolRetries}</strong>
+          </div>
         </div>
       </section>
 
       <section className="spec-section" id="signoz" data-reveal>
         <div className="section-copy">
           <p className="eyebrow">SigNoz expansion</p>
-          <h2>New use cases without replacing the observability stack</h2>
+          <h2>A new use case for SigNoz: release evidence for AI agents.</h2>
         </div>
-        <div className="spec-table">
-          {[
-            ["Dashboards", "Release overview, LLM cost, tool retry loops"],
-            ["Alerts", "Failure rate, retry loops, cost budget"],
-            ["Noz prompts", "Why did this release fail its retry budget?"],
-            ["MCP", "Local endpoint at http://localhost:8000/mcp"]
-          ].map(([label, value]) => (
+        <div className="spec-table spec-grid">
+          {signozCards.map(([label, value, Icon]) => (
             <div className="spec-row" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
+              <Icon size={18} />
+              <div>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
       <section className="closing-cta" data-reveal>
-        <h2>Run the gate against the demo agent</h2>
+        <h2>Make the default agent fail before your users find out.</h2>
         <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
           Enter TraceGate <ArrowRight size={16} />
         </button>
