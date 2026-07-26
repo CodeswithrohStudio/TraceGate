@@ -57,9 +57,9 @@ Rules:
 - Section separation: alternating Background and Surface tint with hairline dividers only where they clarify data boundaries.
 
 ## Structure
-- Macrostructure(s) used: landing - Editorial Index + Product Demo / Workbench, previously Long-Scroll Narrative and Product Demo / Workbench.
-- Shared chrome: landing uses a compact N2 product bar with quiet command-search affordance; app uses persistent sidebar plus contextual topbar.
-- Per-page body archetypes: landing uses H2 restrained split demo, F4 release docket, F5 evidence capture, F6 SigNoz spec sheet, C2 statement close, Ft1 masthead footer. Previous landing used H1 Statement fold, F3 Sticky scroll stack, F5 Annotated capture, C2 Statement + action, Ft4 Statement close.
+- Macrostructure(s) used: landing - Poster Fold + Product Demo / Workbench, previously Editorial Index, Long-Scroll Narrative, and Product Demo / Workbench.
+- Shared chrome: landing uses an N3 glass pill nav over an immersive media fold with mobile drawer; app uses persistent sidebar plus contextual topbar.
+- Per-page body archetypes: landing uses H3/H2 video-backed fold, bottom-left CTA utility, F4 release docket, F5 evidence capture, F6 SigNoz spec sheet, C2 statement close, Ft1 masthead footer. Previous landing used H2 restrained split demo, F4 release docket, F5 evidence capture, F6 SigNoz spec sheet, C2 statement close, Ft1 masthead footer.
 - Build stamp / log: UI build must add the Tastemaker CSS stamp and `.tastemaker/log.json` entry.
 
 ## Navigation chrome

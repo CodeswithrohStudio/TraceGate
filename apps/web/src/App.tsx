@@ -13,11 +13,14 @@ import {
   Eye,
   FileDown,
   KeyRound,
+  Menu,
   Play,
   Search,
   ShieldAlert,
+  Sparkles,
   X
 } from "lucide-react";
+import BoomerangVideoBg from "./BoomerangVideoBg";
 import {
   defaultView,
   navItems,
@@ -29,6 +32,8 @@ import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
 
 const appPaths = new Set(navItems.map((item) => item.path));
+const LANDING_VIDEO =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260511_131941_d136af49-e243-493a-be14-6ff3f24e09e6.mp4";
 gsap.registerPlugin(ScrollTrigger);
 
 export function App() {
@@ -62,25 +67,19 @@ export function App() {
     const ctx = gsap.context(() => {
       const heroTimeline = gsap.timeline();
       heroTimeline
-        .from("[data-hero-context]", {
-          y: 10,
-          opacity: 0,
-          duration: 0.2,
-          ease: "power2.out"
-        })
         .from("[data-hero-title]", {
           y: 14,
           opacity: 0,
           duration: 0.28,
           ease: "power2.out"
-        }, "-=0.05")
-        .from("[data-hero-actions]", {
+        })
+        .from(".film-hero-copy p", {
           y: 10,
           opacity: 0,
           duration: 0.22,
           ease: "power2.out"
         }, "-=0.08")
-        .from("[data-hero-proof]", {
+        .from(".film-bottom-card, .film-play-link", {
           y: 16,
           opacity: 0,
           duration: 0.28,
@@ -196,7 +195,14 @@ function LandingPage({
   navigate: (path: string) => void;
   openEvidence: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const failedCheck = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
+  const navLinks = [
+    ["#narrative", "Product"],
+    ["#evidence", "Evidence"],
+    ["#signoz", "SigNoz"],
+    ["/docs/PRODUCT_FLOW.md", "Docs"]
+  ] as const;
   const signozCards = [
     ["Dashboards", "Release overview, LLM cost, tool retry loops", Activity],
     ["Alerts", "Failure rate, retry loops, cost budget", AlertTriangle],
@@ -204,150 +210,208 @@ function LandingPage({
     ["MCP", "Local endpoint at http://localhost:8000/mcp", Command]
   ] as const;
 
-  return (
-    <main className="site-shell dossier-shell">
-      <nav className="landing-nav editorial-nav" data-reveal>
-        <Brand />
-        <div className="nav-cluster" aria-label="Primary">
-          <a href="#narrative">Product</a>
-          <a href="#evidence">Evidence</a>
-          <a href="#signoz">SigNoz</a>
-          <a href="/docs/PRODUCT_FLOW.md">Docs</a>
-        </div>
-        <button className="command-pill" type="button" aria-label="Open command search">
-          <Command size={15} />
-          <span>Search</span>
-          <kbd>⌘K</kbd>
-        </button>
-        <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
-          Open workbench <ArrowRight size={16} />
-        </button>
-      </nav>
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
-      <section className="dossier-hero">
-        <div className="hero-copy">
-          <p className="eyebrow" data-hero-context>AI agent release control</p>
-          <h1 data-hero-title>Ship agents only when the traces agree.</h1>
-          <p className="hero-lede">
+  return (
+    <main className="immersive-landing">
+      <section className="landing-film">
+        <BoomerangVideoBg src={LANDING_VIDEO} />
+        <div className="film-fallback" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="film-wash" />
+
+        <nav className="film-nav" data-reveal>
+          <Brand />
+          <div className="film-nav-pill" aria-label="Primary">
+            {navLinks.map(([href, label], index) => (
+              <a className={index === 0 ? "active" : ""} href={href} key={href}>
+                {label}
+              </a>
+            ))}
+            <button type="button" onClick={() => navigate("/app")}>
+              Open workbench
+            </button>
+          </div>
+          <div className="film-nav-actions">
+            <button className="film-text-link" type="button" onClick={openEvidence}>
+              <Eye size={15} />
+              Evidence
+            </button>
+            <button className="film-text-link" type="button" onClick={() => navigate("/app")}>
+              <Command size={15} />
+              Run gate
+            </button>
+            <button
+              className="film-menu"
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+            >
+              <Menu className={menuOpen ? "hide" : "show"} size={20} />
+              <X className={menuOpen ? "show" : "hide"} size={20} />
+            </button>
+          </div>
+        </nav>
+
+        <div className={menuOpen ? "mobile-film-scrim open" : "mobile-film-scrim"} onClick={() => setMenuOpen(false)} />
+        <aside className={menuOpen ? "mobile-film-drawer open" : "mobile-film-drawer"} aria-hidden={!menuOpen}>
+          {navLinks.map(([href, label], index) => (
+            <a
+              href={href}
+              key={href}
+              onClick={() => setMenuOpen(false)}
+              style={{ transitionDelay: menuOpen ? `${120 + index * 70}ms` : "0ms" }}
+            >
+              {label}
+            </a>
+          ))}
+          <button type="button" onClick={() => navigate("/app")}>
+            Open workbench
+          </button>
+        </aside>
+
+        <div className="film-hero-copy">
+          <h1 data-hero-title>
+            Ship agents only when the <span>traces agree</span>.
+          </h1>
+          <p>
             TraceGate turns SigNoz telemetry into a release gate: run risky scenarios,
             inspect the spans, and block fragile agent behavior before deploy.
           </p>
-          <div className="hero-actions" data-hero-actions>
-            <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
-              Open workbench <ArrowRight size={16} />
+        </div>
+
+        <div className="film-bottom-card">
+          <div>
+            <Sparkles size={16} />
+            <span>TraceGate release gate</span>
+          </div>
+          <p>{failedCheck.evidence}</p>
+          <div className="film-bottom-actions">
+            <button type="button" onClick={() => navigate("/app")}>
+              Open workbench
             </button>
-            <button className="btn btn-secondary" type="button" onClick={openEvidence}>
-              View evidence <Eye size={16} />
+            <button type="button" onClick={openEvidence}>
+              View evidence.
             </button>
           </div>
         </div>
-        <div className="hero-proof-stack dossier-proof" data-hero-proof>
-          <ReleaseVerdictMockup view={view} className="hero-visual" />
-          <div className="hero-proof-note">
-            <ShieldAlert size={18} />
-            <span>{failedCheck.evidence}</span>
-          </div>
-        </div>
-      </section>
 
-      <section className="release-docket" id="narrative" data-reveal>
-        <div className="docket-heading">
-          <span>Release docket</span>
-          <strong>Latest support-agent run</strong>
-        </div>
-        {[
-          ["Scenario", "Refund abuse", "Prompt, tool call, and retry path exercised"],
-          ["Observation", "tool.trace.lookup", "3 retries recorded on the trace span"],
-          ["Decision", isBlockedLabel(view), "Contract blocks the deploy"]
-        ].map(([label, title, copy]) => (
-          <article className="docket-card" key={label}>
-            <span>{label}</span>
-            <strong>{title}</strong>
-            <p>{copy}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="story-section">
-        <div className="section-copy sticky-copy" data-reveal>
-          <p className="eyebrow">Trace to verdict</p>
-          <h2>The site should feel like evidence, not marketing.</h2>
-          <p>Each beat shows how a messy agent run becomes a decision a reviewer can inspect.</p>
-        </div>
-        <div className="story-steps">
-          {[
-            ["01", "Exercise the risky path", "Refund, latency, and prompt-injection cases run before a release is trusted."],
-            ["02", "Capture the agent behavior", "Model, tool, retry, cost, and latency spans are recorded with OpenTelemetry."],
-            ["03", "Read it inside SigNoz", "Dashboards, alerts, and Noz prompts turn traces into a shared investigation surface."],
-            ["04", "Apply the contract", "TraceGate compares the observed run against the release budget."],
-            ["05", "Publish the evidence", "The blocked decision comes with the exact span and query that justify it."]
-          ].map(([step, title, copy]) => (
-            <article className="story-step" data-story-step key={title}>
-              <span>{step}</span>
-              <div>
-                <strong>{title}</strong>
-                <p>{copy}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="workbench-band" data-reveal>
-        <div className="section-copy">
-          <p className="eyebrow">Workbench proof</p>
-          <h2>A compact control room for one release question.</h2>
-        </div>
-        <MiniDashboard view={view} openApp={() => navigate("/app")} />
-      </section>
-
-      <section className="evidence-band" id="evidence" data-reveal>
-        <EvidenceCapture view={view} />
-        <div className="evidence-ledger">
-          <div className="ledger-row">
-            <span>Failed check</span>
-            <strong>{failedCheck.label}</strong>
-          </div>
-          <div className="ledger-row">
-            <span>Span proof</span>
-            <strong>tool.trace.lookup · retries = 3</strong>
-          </div>
-          <div className="ledger-row">
-            <span>Budget</span>
-            <strong>max retries = {view.reportSummary.maxToolRetries}</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="spec-section" id="signoz" data-reveal>
-        <div className="section-copy">
-          <p className="eyebrow">SigNoz expansion</p>
-          <h2>SigNoz becomes the review surface for agent quality.</h2>
-        </div>
-        <div className="spec-table spec-grid">
-          {signozCards.map(([label, value, Icon]) => (
-            <div className="spec-row" key={label}>
-              <Icon size={18} />
-              <div>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="closing-cta" data-reveal>
-        <h2>Find the fragile agent before production does.</h2>
-        <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
-          Enter TraceGate <ArrowRight size={16} />
+        <button className="film-play-link" type="button" onClick={() => navigate("/app")}>
+          <span><Play size={12} fill="currentColor" /></span>
+          Watch the gate run
+          <small>0:42</small>
         </button>
       </section>
 
-      <footer className="site-footer">
-        <Brand />
-        <span>OpenTelemetry contracts for SigNoz-backed AI agent releases.</span>
-      </footer>
+      <div className="site-shell film-proof-shell">
+        <section className="release-docket" id="narrative" data-reveal>
+          <div className="docket-heading">
+            <span>Release docket</span>
+            <strong>Latest support-agent run</strong>
+          </div>
+          {[
+            ["Scenario", "Refund abuse", "Prompt, tool call, and retry path exercised"],
+            ["Observation", "tool.trace.lookup", "3 retries recorded on the trace span"],
+            ["Decision", isBlockedLabel(view), "Contract blocks the deploy"]
+          ].map(([label, title, copy]) => (
+            <article className="docket-card" key={label}>
+              <span>{label}</span>
+              <strong>{title}</strong>
+              <p>{copy}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="story-section">
+          <div className="section-copy sticky-copy" data-reveal>
+            <p className="eyebrow">Trace to verdict</p>
+            <h2>The site should feel like evidence, not marketing.</h2>
+            <p>Each beat shows how a messy agent run becomes a decision a reviewer can inspect.</p>
+          </div>
+          <div className="story-steps">
+            {[
+              ["01", "Exercise the risky path", "Refund, latency, and prompt-injection cases run before a release is trusted."],
+              ["02", "Capture the agent behavior", "Model, tool, retry, cost, and latency spans are recorded with OpenTelemetry."],
+              ["03", "Read it inside SigNoz", "Dashboards, alerts, and Noz prompts turn traces into a shared investigation surface."],
+              ["04", "Apply the contract", "TraceGate compares the observed run against the release budget."],
+              ["05", "Publish the evidence", "The blocked decision comes with the exact span and query that justify it."]
+            ].map(([step, title, copy]) => (
+              <article className="story-step" data-story-step key={title}>
+                <span>{step}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{copy}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="workbench-band" data-reveal>
+          <div className="section-copy">
+            <p className="eyebrow">Workbench proof</p>
+            <h2>A compact control room for one release question.</h2>
+          </div>
+          <MiniDashboard view={view} openApp={() => navigate("/app")} />
+        </section>
+
+        <section className="evidence-band" id="evidence" data-reveal>
+          <EvidenceCapture view={view} />
+          <div className="evidence-ledger">
+            <div className="ledger-row">
+              <span>Failed check</span>
+              <strong>{failedCheck.label}</strong>
+            </div>
+            <div className="ledger-row">
+              <span>Span proof</span>
+              <strong>tool.trace.lookup · retries = 3</strong>
+            </div>
+            <div className="ledger-row">
+              <span>Budget</span>
+              <strong>max retries = {view.reportSummary.maxToolRetries}</strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="spec-section" id="signoz" data-reveal>
+          <div className="section-copy">
+            <p className="eyebrow">SigNoz expansion</p>
+            <h2>SigNoz becomes the review surface for agent quality.</h2>
+          </div>
+          <div className="spec-table spec-grid">
+            {signozCards.map(([label, value, Icon]) => (
+              <div className="spec-row" key={label}>
+                <Icon size={18} />
+                <div>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="closing-cta" data-reveal>
+          <h2>Find the fragile agent before production does.</h2>
+          <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
+            Enter TraceGate <ArrowRight size={16} />
+          </button>
+        </section>
+
+        <footer className="site-footer">
+          <Brand />
+          <span>OpenTelemetry contracts for SigNoz-backed AI agent releases.</span>
+        </footer>
+      </div>
     </main>
   );
 }
@@ -753,36 +817,6 @@ function SettingsPage({ view }: { view: TraceGateView }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function ReleaseVerdictMockup({ view, className = "" }: { view: TraceGateView; className?: string }) {
-  const failed = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
-  const isBlocked = view.reportSummary.status === "fail";
-  return (
-    <figure className={`release-mock ${className}`} data-reveal>
-      <div className="mock-header">
-        <span>latest/report.json</span>
-        <strong>TraceGate verdict</strong>
-      </div>
-      <div className="mock-verdict">
-        <span className={isBlocked ? "pill fail" : "pill pass"}>{isBlocked ? "Blocked" : "Ready"}</span>
-        <strong>{failed.label}</strong>
-        <p>{failed.evidence}</p>
-      </div>
-      <div className="trace-waterfall" aria-label="Trace waterfall">
-        {view.spanNames.map((span, index) => (
-          <div className={`trace-row trace-${index}`} key={span}>
-            <span>{span}</span>
-            <i />
-          </div>
-        ))}
-      </div>
-      <div className="mock-footer">
-        <code>service.name = 'tracegate-demo-agent'</code>
-        <span>Noz prompt ready</span>
-      </div>
-    </figure>
   );
 }
 

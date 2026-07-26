@@ -1,6 +1,16 @@
 [
   {
     "date": "2026-07-26",
+    "page": "landing",
+    "macrostructure": "Poster Fold + Product Demo / Workbench",
+    "nav": "N3",
+    "hero": "H3/H2",
+    "footer": "Ft1",
+    "knobs": "hero=full-screen boomerang media/centered TraceGate headline/bottom-left CTA; features=F4 release docket + F5 evidence capture",
+    "brief": "Prompt-based landing redesign using immersive video hero while preserving TraceGate copy"
+  },
+  {
+    "date": "2026-07-26",
     "page": "landing+app",
     "macrostructure": "Editorial Index + Product Demo / Workbench",
     "nav": "N2",
