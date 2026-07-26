@@ -20,6 +20,7 @@ import {
   Sparkles,
   X
 } from "lucide-react";
+import BoomerangVideoBg from "./BoomerangVideoBg";
 import {
   defaultView,
   navItems,
@@ -31,6 +32,8 @@ import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
 
 const appPaths = new Set(navItems.map((item) => item.path));
+const LANDING_VIDEO =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260511_131941_d136af49-e243-493a-be14-6ff3f24e09e6.mp4";
 gsap.registerPlugin(ScrollTrigger);
 
 export function App() {
@@ -223,7 +226,7 @@ function LandingPage({
   return (
     <main className="immersive-landing">
       <section className="landing-film">
-        <img className="hero-scene-asset" src="/assets/tracegate-hero-scene.svg" alt="" aria-hidden="true" />
+        <BoomerangVideoBg src={LANDING_VIDEO} />
         <div className="film-wash" />
 
         <nav className="film-nav" data-reveal>
@@ -338,7 +341,13 @@ function LandingPage({
             <h2>TraceGate turns observability into a contract.</h2>
             <p>The product does not ask reviewers to interpret raw telemetry. It packages a failed span, the exact budget, and the Noz prompt into one reviewable packet.</p>
           </div>
-          <EvidenceCapture view={view} />
+          <div className="evidence-frame">
+            <div className="frame-caption">
+              <span>Evidence packet</span>
+              <strong>Critical span isolated</strong>
+            </div>
+            <EvidenceCapture view={view} />
+          </div>
         </section>
 
         <section className="story-section" data-reveal>
@@ -366,7 +375,13 @@ function LandingPage({
             <h2>The workbench answers one release question: can this agent ship?</h2>
             <p>Here the story becomes concrete: seven checks pass, one retry-budget contract fails, and the evidence drawer knows exactly which span proves it.</p>
           </div>
-          <MiniDashboard view={view} openApp={() => navigate("/app")} />
+          <div className="proof-stage">
+            <MiniDashboard view={view} openApp={() => navigate("/app")} />
+            <div className="proof-note">
+              <span>{view.reportSummary.passed}/{view.reportSummary.totalChecks} checks pass</span>
+              <strong>1 blocking trace contract</strong>
+            </div>
+          </div>
         </section>
 
         <section className="evidence-band" id="evidence" data-reveal>

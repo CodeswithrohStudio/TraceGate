@@ -2,6 +2,16 @@
   {
     "date": "2026-07-26",
     "page": "landing",
+    "macrostructure": "Cinematic Editorial Journey + Product Demo / Workbench",
+    "nav": "N3",
+    "hero": "H3",
+    "footer": "Ft1",
+    "knobs": "hero=CloudFront boomerang video/Neue Haas centered promise/bottom-left CTA; arc=Hook -> Risk -> Mechanism -> How it works -> Proof -> SigNoz bridge -> Close; features=soft-green comparison + F5 evidence packet + F4 release rail",
+    "brief": "User-provided green cinematic prompt applied to TraceGate landing while preserving product copy and workbench flow"
+  },
+  {
+    "date": "2026-07-26",
+    "page": "landing",
     "macrostructure": "Long-Scroll Narrative + Product Demo / Workbench",
     "nav": "N3",
     "hero": "H2",

@@ -1,6 +1,6 @@
 # Style lock - TraceGate
 
-Established: 2026-07-24. Source: starter scaffolding from the Tastemaker technical/builder-facing mood.
+Established: 2026-07-24. Updated: 2026-07-26 from the user-provided cinematic green video prompt.
 
 ## Palette
 - Background: #0b1014 (role: app canvas and landing page base)
@@ -13,6 +13,16 @@ Established: 2026-07-24. Source: starter scaffolding from the Tastemaker technic
 - Text muted: #9fb0bf
 - Button label color: white - contrast vs Primary: 4.68 (WCAG AA pass)
 - Dark mode: single locked dark mode - technical mood is dark-mode-native for this project. No runtime theme toggle in the MVP.
+
+Landing prompt palette:
+
+- Landing ink: #1f2a1d (role: hero/nav primary text and landing CTA fill)
+- Landing medium ink: #2d3a2a (role: secondary landing text)
+- Landing body: #4b5b47 (role: landing paragraph text)
+- Landing heading: #336443 (role: landing headings and visual state emphasis)
+- Landing accent: #85AB8B (role: hero emphasis and sparse atmospheric accents)
+- Landing paper: #f8faef and rgba(255,255,255,0.58-0.74) (role: glass cards over video and soft content surfaces)
+- Landing line: rgba(31,42,29,0.12) (role: quiet editorial dividers)
 
 ## Color contract
 
@@ -36,8 +46,8 @@ Rules:
 - Re-run the matrix when adding success, warning, or destructive semantic colors.
 
 ## Typography
-- Display/heading font: Archivo - compact, assertive, builder-facing without becoming terminal cosplay.
-- Body font: IBM Plex Sans.
+- Display/heading font: Neue Haas Grotesk Display Pro 55 Roman, falling back to Neue Haas Grotesk Text Pro, Inter, Helvetica Neue, Helvetica, Arial.
+- Body font: Neue Haas Grotesk Text Pro, falling back to Inter, Helvetica Neue, Helvetica, Arial.
 - Data/code font: IBM Plex Mono reserved for traces, YAML, IDs, timestamps, metrics, and CLI snippets.
 - Scale: base 16px, dense app body at 13-14px, landing display tier capped by headline word count.
 - Letter spacing: 0.
@@ -57,9 +67,9 @@ Rules:
 - Section separation: alternating Background and Surface tint with hairline dividers only where they clarify data boundaries.
 
 ## Structure
-- Macrostructure(s) used: landing - Long-Scroll Narrative + Product Demo / Workbench, previously Poster Fold, Editorial Index, and Product Demo / Workbench.
-- Shared chrome: landing uses an N3 glass pill nav over a local TraceGate hero scene with mobile drawer; app uses persistent sidebar plus contextual topbar.
-- Per-page body archetypes: landing uses H2 local trace-scene fold, bottom-left CTA utility, problem/stakes comparison, F5 evidence capture, F4 step sequence, F6 SigNoz spec sheet, C2 statement close, Ft1 masthead footer. Previous landing used H3/H2 video-backed fold and release docket.
+- Macrostructure(s) used: landing - Cinematic Editorial Journey + Product Demo / Workbench, previously Long-Scroll Narrative, Poster Fold, Editorial Index, and Product Demo / Workbench.
+- Shared chrome: landing uses an N3 translucent pill nav over the CloudFront boomerang media fold with mobile drawer; app uses persistent sidebar plus contextual topbar.
+- Per-page body archetypes: landing uses H3 boomerang video fold, bottom-left CTA utility, problem/stakes comparison, F5 evidence packet, F4 release rail, product proof workbench, F6 SigNoz bridge, C2 statement close, Ft1 masthead footer. Previous landing used an H2 local trace-scene fold.
 - Build stamp / log: UI build must add the Tastemaker CSS stamp and `.tastemaker/log.json` entry.
 
 ## Navigation chrome
@@ -74,9 +84,9 @@ Rules:
 quiet, forensic, technical, decisive
 
 ## Assets
-- Anchor asset: to be created during UI implementation as a real TraceGate product mockup, not decorative abstraction.
-- Asset style: lucide icons, 1.5px stroke, square technical geometry.
-- Illustration vs. photography split: code-native product mockups, charts, trace timelines, and real SigNoz-style evidence panels. No stock photography in the MVP.
+- Anchor asset: CloudFront boomerang video supplied in the user prompt for the cinematic landing hero.
+- Asset style: video-backed soft editorial surfaces on landing; lucide icons and dense code-native product mockups inside proof sections.
+- Illustration vs. photography split: landing hero uses the supplied real media asset; lower sections use code-native product mockups, trace comparisons, charts, and SigNoz-style evidence panels. No stock photography in the MVP.
 - Logo: to be created during UI implementation as a geometric gate/trace mark plus Archivo wordmark.
 
 ## Motion
