@@ -205,8 +205,8 @@ function LandingPage({
   ] as const;
 
   return (
-    <main className="site-shell narrative-shell">
-      <nav className="landing-nav" data-reveal>
+    <main className="site-shell dossier-shell">
+      <nav className="landing-nav editorial-nav" data-reveal>
         <Brand />
         <div className="nav-cluster" aria-label="Primary">
           <a href="#narrative">Product</a>
@@ -224,13 +224,13 @@ function LandingPage({
         </button>
       </nav>
 
-      <section className="narrative-hero">
+      <section className="dossier-hero">
         <div className="hero-copy">
-          <p className="eyebrow" data-hero-context>SigNoz release evidence for AI agents</p>
-          <h1 data-hero-title>Block blind agent releases.</h1>
+          <p className="eyebrow" data-hero-context>AI agent release control</p>
+          <h1 data-hero-title>Ship agents only when the traces agree.</h1>
           <p className="hero-lede">
-            TraceGate runs risky agent scenarios, sends every step to SigNoz, and turns the
-            resulting telemetry into a ship or block decision.
+            TraceGate turns SigNoz telemetry into a release gate: run risky scenarios,
+            inspect the spans, and block fragile agent behavior before deploy.
           </p>
           <div className="hero-actions" data-hero-actions>
             <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
@@ -241,7 +241,7 @@ function LandingPage({
             </button>
           </div>
         </div>
-        <div className="hero-proof-stack" data-hero-proof>
+        <div className="hero-proof-stack dossier-proof" data-hero-proof>
           <ReleaseVerdictMockup view={view} className="hero-visual" />
           <div className="hero-proof-note">
             <ShieldAlert size={18} />
@@ -250,31 +250,37 @@ function LandingPage({
         </div>
       </section>
 
-      <section className="decision-strip" id="narrative" data-reveal>
-        <div>
-          <span>Before</span>
-          <strong>Telemetry is something you inspect after the incident.</strong>
+      <section className="release-docket" id="narrative" data-reveal>
+        <div className="docket-heading">
+          <span>Release docket</span>
+          <strong>Latest support-agent run</strong>
         </div>
-        <ArrowRight size={18} />
-        <div>
-          <span>After</span>
-          <strong>Telemetry becomes the release control before deploy.</strong>
-        </div>
+        {[
+          ["Scenario", "Refund abuse", "Prompt, tool call, and retry path exercised"],
+          ["Observation", "tool.trace.lookup", "3 retries recorded on the trace span"],
+          ["Decision", isBlockedLabel(view), "Contract blocks the deploy"]
+        ].map(([label, title, copy]) => (
+          <article className="docket-card" key={label}>
+            <span>{label}</span>
+            <strong>{title}</strong>
+            <p>{copy}</p>
+          </article>
+        ))}
       </section>
 
       <section className="story-section">
         <div className="section-copy sticky-copy" data-reveal>
-          <p className="eyebrow">The release story</p>
-          <h2>One failed retry budget becomes a clear product decision.</h2>
-          <p>Scroll the run from scenario to verdict. Each step leaves evidence a judge can verify.</p>
+          <p className="eyebrow">Trace to verdict</p>
+          <h2>The site should feel like evidence, not marketing.</h2>
+          <p>Each beat shows how a messy agent run becomes a decision a reviewer can inspect.</p>
         </div>
         <div className="story-steps">
           {[
-            ["01", "Scenario pack", "Refund, latency, and prompt-injection cases exercise the agent before release."],
-            ["02", "Agent run", "The support agent calls the model and tools in deterministic or OpenAI mode."],
-            ["03", "OpenTelemetry", "Root, LLM, and tool spans carry model, cost, and retry evidence."],
-            ["04", "SigNoz evidence", "The traces become the release record instead of a postmortem artifact."],
-            ["05", "Contract verdict", "Seven checks pass. One critical retry budget fails. Release blocked."]
+            ["01", "Exercise the risky path", "Refund, latency, and prompt-injection cases run before a release is trusted."],
+            ["02", "Capture the agent behavior", "Model, tool, retry, cost, and latency spans are recorded with OpenTelemetry."],
+            ["03", "Read it inside SigNoz", "Dashboards, alerts, and Noz prompts turn traces into a shared investigation surface."],
+            ["04", "Apply the contract", "TraceGate compares the observed run against the release budget."],
+            ["05", "Publish the evidence", "The blocked decision comes with the exact span and query that justify it."]
           ].map(([step, title, copy]) => (
             <article className="story-step" data-story-step key={title}>
               <span>{step}</span>
@@ -290,7 +296,7 @@ function LandingPage({
       <section className="workbench-band" data-reveal>
         <div className="section-copy">
           <p className="eyebrow">Workbench proof</p>
-          <h2>The first app screen answers one question: can this ship?</h2>
+          <h2>A compact control room for one release question.</h2>
         </div>
         <MiniDashboard view={view} openApp={() => navigate("/app")} />
       </section>
@@ -316,7 +322,7 @@ function LandingPage({
       <section className="spec-section" id="signoz" data-reveal>
         <div className="section-copy">
           <p className="eyebrow">SigNoz expansion</p>
-          <h2>A new use case for SigNoz: release evidence for AI agents.</h2>
+          <h2>SigNoz becomes the review surface for agent quality.</h2>
         </div>
         <div className="spec-table spec-grid">
           {signozCards.map(([label, value, Icon]) => (
@@ -332,7 +338,7 @@ function LandingPage({
       </section>
 
       <section className="closing-cta" data-reveal>
-        <h2>Make the default agent fail before your users find out.</h2>
+        <h2>Find the fragile agent before production does.</h2>
         <button className="btn btn-primary" type="button" onClick={() => navigate("/app")}>
           Enter TraceGate <ArrowRight size={16} />
         </button>
@@ -344,6 +350,10 @@ function LandingPage({
       </footer>
     </main>
   );
+}
+
+function isBlockedLabel(view: TraceGateView) {
+  return view.reportSummary.status === "fail" ? "Blocked" : "Ready";
 }
 
 function AppShell({
@@ -475,16 +485,16 @@ function OverviewPage({
   const isBlocked = view.reportSummary.status === "fail";
   return (
     <div className="page-grid overview-grid">
-      <section className="verdict-panel">
-        <div>
+      <section className="verdict-panel release-summary">
+        <div className="verdict-copy">
           <p className="eyebrow">Latest release verdict</p>
-          <h1>{isBlocked ? "Blocked by retry evidence" : "Ready with trace evidence"}</h1>
-          <p>
-            {view.reportSummary.passed} of {view.reportSummary.totalChecks} checks passed.
-            {isBlocked
-              ? " One critical contract failure prevents this agent from shipping."
-              : " The release is observable enough to ship."}
-          </p>
+          <h1>{isBlocked ? "Blocked by trace evidence" : "Ready with trace evidence"}</h1>
+          <div className="verdict-scoreline">
+            <span>{view.reportSummary.passed}/{view.reportSummary.totalChecks} checks passed</span>
+            <span>{view.reportSummary.criticalFailures} critical failure</span>
+            <span>{view.reportSummary.serviceName}</span>
+          </div>
+          <p>{failed?.evidence ?? "All contract checks have attached trace evidence."}</p>
         </div>
         <div className="verdict-badge">
           <ShieldAlert size={22} />
@@ -494,7 +504,7 @@ function OverviewPage({
 
       <MetricRow view={view} />
 
-      <section className="panel wide">
+      <section className="panel wide gate-panel">
         <PanelHeader title="Gate matrix" action="Open failed evidence" onAction={() => failed && openEvidence(failed)} />
         <div className="check-list">
           {view.gateChecks.map((check) => (
@@ -515,7 +525,7 @@ function OverviewPage({
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel action-panel">
         <PanelHeader title="Next actions" />
         <div className="action-stack">
           <button className="action-row" type="button" onClick={() => failed && openEvidence(failed)}>

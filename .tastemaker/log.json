@@ -1,6 +1,16 @@
 [
   {
     "date": "2026-07-26",
+    "page": "landing+app",
+    "macrostructure": "Editorial Index + Product Demo / Workbench",
+    "nav": "N2",
+    "hero": "H2",
+    "footer": "Ft1",
+    "knobs": "hero=restrained split demo/dossier proof; features=F4 release docket + F5 evidence capture; app=compact release control overview",
+    "brief": "TraceGate Tastemaker taste revamp with smaller hierarchy and centered status glyphs"
+  },
+  {
+    "date": "2026-07-26",
     "page": "landing",
     "macrostructure": "Long-Scroll Narrative",
     "nav": "N5/N6",
