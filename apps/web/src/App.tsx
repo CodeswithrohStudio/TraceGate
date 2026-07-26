@@ -181,6 +181,9 @@ export function App() {
     setRunState("evaluating");
     let nextView: TraceGateView;
     try {
+      if (isHostedStaticApp()) {
+        throw new Error("Use hosted browser evaluator.");
+      }
       const response = await fetch("/api/judge-run", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -246,6 +249,10 @@ async function loadReport(): Promise<TraceGateView> {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isHostedStaticApp(): boolean {
+  return window.location.hostname.endsWith("vercel.app");
 }
 
 function createClientJudgeReport(input: JudgeRunInput): TraceGateReport {
