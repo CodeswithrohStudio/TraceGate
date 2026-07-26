@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
@@ -30,6 +31,18 @@ import {
 import type { GateCheck, RuntimeStatus, Scenario, TraceGateReport, TraceGateView } from "./data";
 
 type RunState = "idle" | "preparing" | "telemetry" | "evaluating" | "blocked";
+type JudgeRunInput = {
+  serviceName: string;
+  scenarioId: string;
+  prompt: string;
+  toolName: string;
+  maxToolRetries: number;
+  observedRetries: number;
+  maxRunCostUsd: number;
+  observedCostUsd: number;
+  maxP95LatencyMs: number;
+  observedLatencyMs: number;
+};
 
 const appPaths = new Set(navItems.map((item) => item.path));
 const LANDING_VIDEO =
@@ -43,6 +56,18 @@ export function App() {
   const [selectedCheck, setSelectedCheck] = useState<GateCheck>(
     defaultView.gateChecks.find((check) => check.status === "fail") ?? defaultView.gateChecks[0]
   );
+  const [judgeInput, setJudgeInput] = useState<JudgeRunInput>({
+    serviceName: "judge-support-agent",
+    scenarioId: "checkout-latency",
+    prompt: "A checkout agent is slow during refunds. Investigate traces and summarize the issue.",
+    toolName: "trace.lookup",
+    maxToolRetries: 1,
+    observedRetries: 3,
+    maxRunCostUsd: 0.005,
+    observedCostUsd: 0.00012,
+    maxP95LatencyMs: 2000,
+    observedLatencyMs: 3318
+  });
   const [runState, setRunState] = useState<RunState>("idle");
   const [setupOpen, setSetupOpen] = useState(false);
 
@@ -130,12 +155,34 @@ export function App() {
 
   const runGate = async () => {
     setRunState("preparing");
-    setTimeout(() => setRunState("telemetry"), 450);
-    setTimeout(() => setRunState("evaluating"), 900);
+    await wait(240);
+    setRunState("telemetry");
+    await wait(240);
+    setRunState("evaluating");
     const response = await fetch("/api/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ modelMode: view.status?.hasOpenAIKey ? "auto" : "deterministic" })
+    });
+    const payload = (await response.json()) as RunPayload;
+    const nextView = viewFromReport(payload.reportPayload?.report ?? null, payload.reportPayload?.status);
+    setView(nextView);
+    const failedCheck = nextView.gateChecks.find((check) => check.status === "fail") ?? nextView.gateChecks[0];
+    setSelectedCheck(failedCheck);
+    setRunState(nextView.reportSummary.status === "pass" ? "idle" : "blocked");
+    openEvidence(failedCheck);
+  };
+
+  const runJudgeGate = async () => {
+    setRunState("preparing");
+    await wait(180);
+    setRunState("telemetry");
+    await wait(180);
+    setRunState("evaluating");
+    const response = await fetch("/api/judge-run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(judgeInput)
     });
     const payload = (await response.json()) as RunPayload;
     const nextView = viewFromReport(payload.reportPayload?.report ?? null, payload.reportPayload?.status);
@@ -157,7 +204,10 @@ export function App() {
       path={appPaths.has(path) ? path : "/app"}
       navigate={navigate}
       runGate={runGate}
+      runJudgeGate={runJudgeGate}
       runState={runState}
+      judgeInput={judgeInput}
+      setJudgeInput={setJudgeInput}
       evidenceOpen={evidenceOpen}
       setEvidenceOpen={setEvidenceOpen}
       selectedCheck={selectedCheck}
@@ -184,6 +234,10 @@ async function loadReport(): Promise<TraceGateView> {
   const response = await fetch("/api/report");
   const payload = (await response.json()) as ReportPayload;
   return viewFromReport(payload.report, payload.status);
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function LandingPage({
@@ -445,7 +499,10 @@ function AppShell({
   path,
   navigate,
   runGate,
+  runJudgeGate,
   runState,
+  judgeInput,
+  setJudgeInput,
   evidenceOpen,
   setEvidenceOpen,
   selectedCheck,
@@ -457,7 +514,10 @@ function AppShell({
   path: string;
   navigate: (path: string) => void;
   runGate: () => Promise<void>;
+  runJudgeGate: () => Promise<void>;
   runState: RunState;
+  judgeInput: JudgeRunInput;
+  setJudgeInput: Dispatch<SetStateAction<JudgeRunInput>>;
   evidenceOpen: boolean;
   setEvidenceOpen: (open: boolean) => void;
   selectedCheck: GateCheck;
@@ -522,7 +582,16 @@ function AppShell({
 
         <div className="content-area" data-reveal>
           <RunProgress runState={runState} />
-          <CurrentPage path={path} openEvidence={openEvidence} navigate={navigate} view={view} />
+          <CurrentPage
+            path={path}
+            openEvidence={openEvidence}
+            navigate={navigate}
+            view={view}
+            judgeInput={judgeInput}
+            setJudgeInput={setJudgeInput}
+            runJudgeGate={runJudgeGate}
+            runState={runState}
+          />
         </div>
       </section>
 
@@ -530,6 +599,7 @@ function AppShell({
         open={evidenceOpen}
         onClose={() => setEvidenceOpen(false)}
         check={selectedCheck}
+        view={view}
       />
       {setupOpen ? <SetupModal view={view} onClose={() => setSetupOpen(false)} /> : null}
     </div>
@@ -540,31 +610,67 @@ function CurrentPage({
   path,
   openEvidence,
   navigate,
-  view
+  view,
+  judgeInput,
+  setJudgeInput,
+  runJudgeGate,
+  runState
 }: {
   path: string;
   openEvidence: (check?: GateCheck) => void;
   navigate: (path: string) => void;
   view: TraceGateView;
+  judgeInput: JudgeRunInput;
+  setJudgeInput: Dispatch<SetStateAction<JudgeRunInput>>;
+  runJudgeGate: () => Promise<void>;
+  runState: RunState;
 }) {
   if (path === "/app/runs") return <RunsPage view={view} openEvidence={openEvidence} />;
   if (path === "/app/contracts") return <ContractsPage view={view} />;
-  if (path === "/app/scenarios") return <ScenariosPage view={view} />;
+  if (path === "/app/scenarios") {
+    return (
+      <ScenariosPage
+        view={view}
+        judgeInput={judgeInput}
+        setJudgeInput={setJudgeInput}
+        runJudgeGate={runJudgeGate}
+        runState={runState}
+      />
+    );
+  }
   if (path === "/app/evidence") return <EvidencePage view={view} openEvidence={openEvidence} />;
   if (path === "/app/signoz") return <SignozPage view={view} />;
   if (path === "/app/alerts") return <AlertsPage view={view} />;
   if (path === "/app/settings") return <SettingsPage view={view} />;
-  return <OverviewPage view={view} openEvidence={openEvidence} navigate={navigate} />;
+  return (
+    <OverviewPage
+      view={view}
+      openEvidence={openEvidence}
+      navigate={navigate}
+      judgeInput={judgeInput}
+      setJudgeInput={setJudgeInput}
+      runJudgeGate={runJudgeGate}
+      runState={runState}
+    />
+  );
 }
 
 function OverviewPage({
   view,
   openEvidence,
-  navigate
+  navigate,
+  judgeInput,
+  setJudgeInput,
+  runJudgeGate,
+  runState
 }: {
   view: TraceGateView;
   openEvidence: (check?: GateCheck) => void;
   navigate: (path: string) => void;
+  judgeInput: JudgeRunInput;
+  setJudgeInput: Dispatch<SetStateAction<JudgeRunInput>>;
+  runJudgeGate: () => Promise<void>;
+  runState: RunState;
 }) {
   const failed = view.gateChecks.find((check) => check.status === "fail");
   const isBlocked = view.reportSummary.status === "fail";
@@ -588,6 +694,13 @@ function OverviewPage({
       </section>
 
       <MetricRow view={view} />
+
+      <JudgeRunPanel
+        judgeInput={judgeInput}
+        setJudgeInput={setJudgeInput}
+        runJudgeGate={runJudgeGate}
+        runState={runState}
+      />
 
       <section className="panel wide gate-panel">
         <PanelHeader title="Gate matrix" action="Open failed evidence" onAction={() => failed && openEvidence(failed)} />
@@ -628,6 +741,89 @@ function OverviewPage({
         </div>
       </section>
     </div>
+  );
+}
+
+function JudgeRunPanel({
+  judgeInput,
+  setJudgeInput,
+  runJudgeGate,
+  runState
+}: {
+  judgeInput: JudgeRunInput;
+  setJudgeInput: Dispatch<SetStateAction<JudgeRunInput>>;
+  runJudgeGate: () => Promise<void>;
+  runState: RunState;
+}) {
+  const running = runState === "preparing" || runState === "telemetry" || runState === "evaluating";
+  const updateText = (key: keyof JudgeRunInput) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setJudgeInput((current) => ({ ...current, [key]: event.target.value }));
+  };
+  const updateNumber = (key: keyof JudgeRunInput) => (event: ChangeEvent<HTMLInputElement>) => {
+    setJudgeInput((current) => ({ ...current, [key]: Number(event.target.value) }));
+  };
+
+  return (
+    <section className="panel wide judge-panel">
+      <div className="judge-panel-head">
+        <div>
+          <p className="eyebrow">Judge test mode</p>
+          <h2>Run your own agent release gate</h2>
+          <p>
+            The preloaded values are editable starter inputs. Change the observed behavior, run the gate,
+            and TraceGate will generate a fresh verdict, scenario, evidence packet, SigNoz queries,
+            dashboards, and alerts.
+          </p>
+        </div>
+        <button className="btn btn-primary" type="button" onClick={runJudgeGate} disabled={running}>
+          <Play size={15} />
+          {running ? "Running" : "Run judge gate"}
+        </button>
+      </div>
+
+      <div className="judge-form">
+        <label>
+          <span>Service name</span>
+          <input value={judgeInput.serviceName} onChange={updateText("serviceName")} />
+        </label>
+        <label>
+          <span>Scenario ID</span>
+          <input value={judgeInput.scenarioId} onChange={updateText("scenarioId")} />
+        </label>
+        <label>
+          <span>Tool under test</span>
+          <input value={judgeInput.toolName} onChange={updateText("toolName")} />
+        </label>
+        <label className="judge-form-wide">
+          <span>Agent prompt</span>
+          <textarea value={judgeInput.prompt} onChange={updateText("prompt")} rows={3} />
+        </label>
+        <label>
+          <span>Retry budget</span>
+          <input min={0} max={10} type="number" value={judgeInput.maxToolRetries} onChange={updateNumber("maxToolRetries")} />
+        </label>
+        <label>
+          <span>Observed retries</span>
+          <input min={0} max={20} type="number" value={judgeInput.observedRetries} onChange={updateNumber("observedRetries")} />
+        </label>
+        <label>
+          <span>Cost budget USD</span>
+          <input min={0} max={1} step="0.00001" type="number" value={judgeInput.maxRunCostUsd} onChange={updateNumber("maxRunCostUsd")} />
+        </label>
+        <label>
+          <span>Observed cost USD</span>
+          <input min={0} max={1} step="0.00001" type="number" value={judgeInput.observedCostUsd} onChange={updateNumber("observedCostUsd")} />
+        </label>
+        <label>
+          <span>Latency budget ms</span>
+          <input min={1} max={60000} type="number" value={judgeInput.maxP95LatencyMs} onChange={updateNumber("maxP95LatencyMs")} />
+        </label>
+        <label>
+          <span>Observed latency ms</span>
+          <input min={1} max={60000} type="number" value={judgeInput.observedLatencyMs} onChange={updateNumber("observedLatencyMs")} />
+        </label>
+      </div>
+    </section>
   );
 }
 
@@ -710,13 +906,31 @@ checks:
   );
 }
 
-function ScenariosPage({ view }: { view: TraceGateView }) {
+function ScenariosPage({
+  view,
+  judgeInput,
+  setJudgeInput,
+  runJudgeGate,
+  runState
+}: {
+  view: TraceGateView;
+  judgeInput: JudgeRunInput;
+  setJudgeInput: Dispatch<SetStateAction<JudgeRunInput>>;
+  runJudgeGate: () => Promise<void>;
+  runState: RunState;
+}) {
   return (
     <div className="page-stack">
       <PageTitle
         eyebrow="Scenarios"
         title="Agent missions that create useful telemetry"
         copy="Each scenario exercises a behavior path and expects a safe, explainable outcome."
+      />
+      <JudgeRunPanel
+        judgeInput={judgeInput}
+        setJudgeInput={setJudgeInput}
+        runJudgeGate={runJudgeGate}
+        runState={runState}
       />
       <div className="scenario-grid">
         {view.scenarios.map((scenario) => (
@@ -743,9 +957,10 @@ function EvidencePage({ view, openEvidence }: { view: TraceGateView; openEvidenc
         <section className="panel">
           <PanelHeader title="Suggested queries" />
           <div className="query-stack">
-            <code>service.name = 'tracegate-demo-agent'</code>
+            <code>service.name = '{view.reportSummary.serviceName}'</code>
             <code>name CONTAINS 'agent.'</code>
             <code>name CONTAINS 'llm.' OR name CONTAINS 'tool.'</code>
+            <code>name = '{primaryToolSpan(view)}'</code>
           </div>
         </section>
       </div>
@@ -860,13 +1075,14 @@ function MiniDashboard({ view, openApp }: { view: TraceGateView; openApp: () => 
 
 function EvidenceCapture({ view }: { view: TraceGateView }) {
   const failed = view.gateChecks.find((check) => check.status === "fail") ?? view.gateChecks[0];
+  const toolSpan = primaryToolSpan(view);
   return (
     <div className="evidence-capture">
       <div className="capture-left">
         <span className="pill fail">Critical</span>
         <h3>{failed.id}</h3>
         <p>{failed.evidence}</p>
-        <code>name = 'tool.trace.lookup'</code>
+        <code>name = '{toolSpan}'</code>
       </div>
       <div className="capture-right">
         <span>Noz prompt</span>
@@ -936,12 +1152,15 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
 function EvidenceDrawer({
   open,
   onClose,
-  check
+  check,
+  view
 }: {
   open: boolean;
   onClose: () => void;
   check: GateCheck;
+  view: TraceGateView;
 }) {
+  const toolSpan = primaryToolSpan(view);
   return (
     <aside className={open ? "drawer open" : "drawer"} aria-hidden={!open}>
       <div className="drawer-head">
@@ -959,7 +1178,7 @@ function EvidenceDrawer({
       </div>
       <div className="drawer-section">
         <strong>SigNoz query</strong>
-        <code>service.name = 'tracegate-demo-agent' AND name = 'tool.trace.lookup'</code>
+        <code>service.name = '{view.reportSummary.serviceName}' AND name = '{toolSpan}'</code>
       </div>
       <div className="drawer-section">
         <strong>Noz prompt</strong>
@@ -971,6 +1190,10 @@ function EvidenceDrawer({
       </button>
     </aside>
   );
+}
+
+function primaryToolSpan(view: TraceGateView): string {
+  return view.spanNames.find((span) => span.startsWith("tool.")) ?? "tool.trace.lookup";
 }
 
 function SetupModal({ view, onClose }: { view: TraceGateView; onClose: () => void }) {

@@ -51,6 +51,11 @@ export type TraceGateReport = {
     name: string;
     version: string;
     serviceName: string;
+    budgets?: {
+      maxRunCostUsd: number;
+      maxP95LatencyMs: number;
+      maxToolRetries: number;
+    };
   };
   status: "pass" | "fail";
   summary: {
@@ -285,8 +290,8 @@ export function viewFromReport(report: TraceGateReport | null, status?: RuntimeS
       criticalFailures: report.summary.criticalFailures,
       totalCostUsd: `$${report.summary.totalCostUsd.toFixed(6)}`,
       p95LatencyMs: `${report.summary.p95LatencyMs}ms`,
-      maxRunCostUsd: reportSummary.maxRunCostUsd,
-      maxToolRetries: reportSummary.maxToolRetries
+      maxRunCostUsd: report.contract.budgets ? `$${report.contract.budgets.maxRunCostUsd}` : reportSummary.maxRunCostUsd,
+      maxToolRetries: report.contract.budgets?.maxToolRetries ?? reportSummary.maxToolRetries
     },
     gateChecks: report.checks.map((check) => ({
       id: check.id,

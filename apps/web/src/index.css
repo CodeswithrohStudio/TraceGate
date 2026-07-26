@@ -1668,6 +1668,86 @@ kbd {
   font-size: 18px;
 }
 
+.judge-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 18px;
+}
+
+.judge-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+}
+
+.judge-panel-head h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  line-height: 1.08;
+}
+
+.judge-panel-head p:not(.eyebrow) {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+.judge-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.judge-form label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.judge-form label span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.judge-form input,
+.judge-form textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-bg);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.judge-form textarea {
+  min-height: 88px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.judge-form input:focus,
+.judge-form textarea:focus {
+  border-color: var(--color-primary);
+  outline: 2px solid rgba(38, 118, 198, 0.35);
+  outline-offset: 0;
+}
+
+.judge-form-wide {
+  grid-column: span 3;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .text-action {
   min-height: 32px;
   padding: 0;
@@ -2192,6 +2272,19 @@ kbd {
 
   .topbar {
     flex-wrap: wrap;
+  }
+
+  .judge-panel-head,
+  .judge-form {
+    grid-template-columns: 1fr;
+  }
+
+  .judge-panel-head .btn {
+    width: 100%;
+  }
+
+  .judge-form-wide {
+    grid-column: auto;
   }
 
   .action-panel {
